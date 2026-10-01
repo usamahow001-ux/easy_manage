@@ -119,13 +119,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryGreen.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(14),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/images/app_logo.png',
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.cover,
                       ),
-                      child: const Icon(Icons.storefront_rounded, color: AppTheme.primaryGreen, size: 24),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
