@@ -213,12 +213,18 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Text(
-                      statusText,
-                      style: GoogleFonts.outfit(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          statusText,
+                          style: GoogleFonts.outfit(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -243,18 +249,20 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                 const SizedBox(height: 12),
                 const Divider(height: 1),
                 const SizedBox(height: 10),
-                // Reminder & Statement quick action buttons
                 Row(
                   children: [
                     if (party.phone.isNotEmpty) ...[
                       Expanded(
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.mark_chat_unread_rounded, color: Color(0xFF25D366), size: 16),
-                          label: Text('WhatsApp', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                          label: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('WhatsApp', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                          ),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: isDark ? Colors.white : Colors.black87,
                             side: BorderSide(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: () {
@@ -271,11 +279,14 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                       Expanded(
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.sms_outlined, color: AppTheme.primaryGreen, size: 16),
-                          label: Text('SMS', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                          label: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text('SMS', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                          ),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: isDark ? Colors.white : Colors.black87,
                             side: BorderSide(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                           ),
                           onPressed: () {
@@ -293,11 +304,14 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                     Expanded(
                       child: OutlinedButton.icon(
                         icon: const Icon(Icons.share_outlined, color: AppTheme.primaryGreen, size: 16),
-                        label: Text('PDF Report', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text('PDF Report', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                        ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: isDark ? Colors.white : Colors.black87,
                           side: BorderSide(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                         onPressed: () async {

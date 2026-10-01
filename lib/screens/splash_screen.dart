@@ -178,7 +178,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
                         child: Column(
                           children: [
                             Text(
-                              'EasyManage',
+                              'Easy Manage',
                               style: GoogleFonts.outfit(
                                 fontSize: 34,
                                 fontWeight: FontWeight.bold,
