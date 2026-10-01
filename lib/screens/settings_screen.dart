@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../providers/app_state_provider.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'recycle_bin_screen.dart';
 import 'chat_backup_screen.dart';
 import 'language_selection_screen.dart';
@@ -284,7 +285,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     onTap: () => _showPrivacyPolicyModal(context),
                   ),
                   const Divider(height: 1, indent: 56),
-                  // 3. Data Reset
+                  // 3. Terms of Service
+                  ListTile(
+                    leading: const Icon(Icons.description_outlined, color: Color(0xFF3B82F6), size: 22),
+                    title: Text(loc.tr('terms_of_service'), style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14)),
+                    subtitle: Text(loc.tr('terms_subtitle'), style: GoogleFonts.inter(fontSize: 12, color: Colors.grey)),
+                    trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey),
+                    onTap: () => _showTermsModal(context),
+                  ),
+                  const Divider(height: 1, indent: 56),
+                  // 4. Data Reset
                   ListTile(
                     leading: const Icon(Icons.cleaning_services_rounded, color: AppTheme.debitRed, size: 22),
                     title: Text(loc.tr('delete_account'), style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14, color: AppTheme.debitRed)),
@@ -596,6 +606,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Future<void> _openExternalLink(String urlString) async {
+    final uri = Uri.parse(urlString);
+    try {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      try {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (_) {}
+    }
+  }
+
   // 3. Privacy Policy Modal
   void _showPrivacyPolicyModal(BuildContext context) {
     showModalBottomSheet(
@@ -626,7 +647,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Text('1. Data Ownership & Security', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen)),
                   const SizedBox(height: 4),
                   Text(
-                    'EasyManage is built with an offline-first architecture. All customer records, invoices, supplier payables, and cashbook entries are encrypted and stored locally on your device with optional encrypted Google Drive backup.',
+                    'Easy Manage is built with an offline-first architecture. All customer records, invoices, supplier payables, and cashbook entries are encrypted and stored locally on your device with optional encrypted Google Drive backup.',
                     style: GoogleFonts.inter(fontSize: 13, height: 1.5),
                   ),
                   const SizedBox(height: 14),
@@ -643,13 +664,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     'Your Google Drive backups are stored in your own personal Google account storage. We do not access, sell, or share your business ledger data.',
                     style: GoogleFonts.inter(fontSize: 13, height: 1.5),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+                  // Button: Open Full Online Policy
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: AppTheme.primaryGreen),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.open_in_browser_rounded, color: AppTheme.primaryGreen, size: 20),
+                    label: const Text(
+                      'View Full Official Privacy Policy (Web)',
+                      style: TextStyle(color: AppTheme.primaryGreen, fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    onPressed: () => _openExternalLink('https://usamahow001-ux.github.io/easy_manage/privacy-policy.html'),
+                  ),
+                  const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
                     height: 48,
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(ctx),
                       child: const Text('I Understand & Agree'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // Terms of Service Modal
+  void _showTermsModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppTheme.darkCard : Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          maxChildSize: 0.9,
+          minChildSize: 0.5,
+          expand: false,
+          builder: (_, scrollController) {
+            return Padding(
+              padding: const EdgeInsets.all(22),
+              child: ListView(
+                controller: scrollController,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Terms of Service', style: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.bold)),
+                      IconButton(icon: const Icon(Icons.close_rounded), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text('1. Use of Service', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Easy Manage is designed to help small businesses, merchants, and individuals track transactions, customer balances, and cash flow. You agree to use the application for lawful bookkeeping purposes only.',
+                    style: GoogleFonts.inter(fontSize: 13, height: 1.5),
+                  ),
+                  const SizedBox(height: 14),
+                  Text('2. Data Responsibility', style: GoogleFonts.outfit(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primaryGreen)),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Easy Manage is an offline-first app. Users are responsible for taking periodic backups to Google Drive to ensure business continuity if devices are replaced or lost.',
+                    style: GoogleFonts.inter(fontSize: 13, height: 1.5),
+                  ),
+                  const SizedBox(height: 20),
+                  // Button: Open Full Online Terms
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      side: const BorderSide(color: Color(0xFF3B82F6)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    icon: const Icon(Icons.open_in_browser_rounded, color: Color(0xFF3B82F6), size: 20),
+                    label: const Text(
+                      'View Full Terms of Service (Web)',
+                      style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    onPressed: () => _openExternalLink('https://usamahow001-ux.github.io/easy_manage/terms.html'),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text('I Agree to Terms'),
                     ),
                   ),
                 ],

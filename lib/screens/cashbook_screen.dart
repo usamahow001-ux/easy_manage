@@ -113,13 +113,17 @@ class CashbookScreen extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      loc.tr('net_balance'),
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                    Expanded(
+                      child: Text(
+                        loc.tr('net_balance'),
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                    const SizedBox(width: 8),
                     Text(
                       '${netCash >= 0 ? "+" : "-"} $currency ${netCash.abs().toStringAsFixed(0)}',
                       style: GoogleFonts.outfit(
