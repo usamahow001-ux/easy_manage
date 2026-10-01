@@ -39,7 +39,7 @@ class EasyManageApp extends StatelessWidget {
     final provider = context.watch<AppStateProvider>();
 
     return MaterialApp(
-      title: 'EasyManage',
+      title: 'Easy Manage',
       debugShowCheckedModeBanner: false,
       themeMode: provider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
       theme: AppTheme.lightTheme(),

@@ -947,9 +947,13 @@ class _ChatBackupScreenState extends State<ChatBackupScreen> {
                             children: [
                               const Icon(Icons.check_circle_rounded, color: AppTheme.primaryGreen, size: 18),
                               const SizedBox(width: 6),
-                              Text(
-                                'Backup Found on Google Drive!',
-                                style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryGreen),
+                              Expanded(
+                                child: Text(
+                                  'Backup Found on Google Drive!',
+                                  style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryGreen),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
                             ],
                           ),

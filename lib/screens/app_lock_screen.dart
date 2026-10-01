@@ -120,33 +120,40 @@ class _AppLockScreenState extends State<AppLockScreen> {
     final provider = context.watch<AppStateProvider>();
     final isDark = provider.isDarkMode;
 
-    return Scaffold(
-      backgroundColor: isDark ? AppTheme.darkBg : AppTheme.lightBg,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Lock Icon
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primaryGreen.withValues(alpha: 0.12),
-                    shape: BoxShape.circle,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark ? AppTheme.darkBg : AppTheme.lightBg,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Lock Icon
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryGreen.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.lock_rounded, size: 42, color: AppTheme.primaryGreen),
                   ),
-                  child: const Icon(Icons.lock_rounded, size: 42, color: AppTheme.primaryGreen),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'EasyManage Locked',
-                  style: GoogleFonts.outfit(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                  const SizedBox(height: 16),
+                  Text(
+                    'Easy Manage Locked',
+                    style: GoogleFonts.outfit(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                    ),
                   ),
-                ),
                 const SizedBox(height: 4),
                 Text(
                   'Enter your 4-digit PIN to access your ledgers',
@@ -267,8 +274,9 @@ class _AppLockScreenState extends State<AppLockScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildKeypadRow(List<String> numbers, bool isDark) {
     return Row(

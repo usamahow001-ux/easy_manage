@@ -27,28 +27,41 @@ class WhatsAppService {
       'https://wa.me/$formattedPhone?text=${Uri.encodeComponent(message)}',
     );
 
-    if (await canLaunchUrl(uri)) {
-      return await launchUrl(uri, mode: LaunchMode.externalApplication);
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        return await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+      return true;
+    } catch (_) {
+      try {
+        return await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (_) {
+        return false;
+      }
     }
-    return false;
   }
 
   static Future<bool> makePhoneCall(String phone) async {
-    final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) {
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri.parse('tel:$cleanPhone');
+    try {
       return await launchUrl(uri);
+    } catch (_) {
+      return false;
     }
-    return false;
   }
 
   static Future<bool> sendSms({
     required String phone,
     required String message,
   }) async {
-    final uri = Uri.parse('sms:$phone?body=${Uri.encodeComponent(message)}');
-    if (await canLaunchUrl(uri)) {
+    final cleanPhone = phone.replaceAll(RegExp(r'[^0-9+]'), '');
+    final uri = Uri.parse('sms:$cleanPhone?body=${Uri.encodeComponent(message)}');
+    try {
       return await launchUrl(uri);
+    } catch (_) {
+      return false;
     }
-    return false;
   }
 }
