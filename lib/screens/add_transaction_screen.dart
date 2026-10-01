@@ -27,7 +27,6 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
   final TextEditingController _noteController = TextEditingController();
   final TextEditingController _billNoController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
-  PaymentMode _paymentMode = PaymentMode.cash;
 
   static const List<String> presetNotes = [
     'Advance Payment',
@@ -258,121 +257,81 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            // Payment Mode & Date Row
-            Row(
-              children: [
-                // Date Picker
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        loc.tr('date'),
-                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
-                      ),
-                      const SizedBox(height: 8),
-                      InkWell(
-                        onTap: () async {
-                          final picked = await showDatePicker(
-                            context: context,
-                            initialDate: _selectedDate,
-                            firstDate: DateTime(2020),
-                            lastDate: DateTime(2030),
-                          );
-                          if (picked != null) {
-                            setState(() => _selectedDate = picked);
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(14),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                            borderRadius: BorderRadius.circular(14),
-                            color: isDark ? AppTheme.darkCardElevated : Colors.white,
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.calendar_today_rounded, size: 16, color: AppTheme.primaryGreen),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  DateFormat('dd MMM yyyy').format(_selectedDate),
-                                  style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+            // Date & Time Box (Full Width)
+            Text(
+              '${loc.tr('date')} & Time',
+              style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+            ),
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () async {
+                final pickedDate = await showDatePicker(
+                  context: context,
+                  initialDate: _selectedDate,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime(2030),
+                );
+                if (pickedDate != null && context.mounted) {
+                  final initialTime = TimeOfDay.fromDateTime(_selectedDate);
+                  final pickedTime = await showTimePicker(
+                    context: context,
+                    initialTime: initialTime,
+                  );
+                  if (pickedTime != null) {
+                    setState(() {
+                      _selectedDate = DateTime(
+                        pickedDate.year,
+                        pickedDate.month,
+                        pickedDate.day,
+                        pickedTime.hour,
+                        pickedTime.minute,
+                      );
+                    });
+                  } else {
+                    setState(() {
+                      _selectedDate = DateTime(
+                        pickedDate.year,
+                        pickedDate.month,
+                        pickedDate.day,
+                        _selectedDate.hour,
+                        _selectedDate.minute,
+                      );
+                    });
+                  }
+                }
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                decoration: BoxDecoration(
+                  border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                  borderRadius: BorderRadius.circular(14),
+                  color: isDark ? AppTheme.darkCardElevated : Colors.white,
                 ),
-                const SizedBox(width: 12),
-                // Payment Mode
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        loc.tr('payment_mode'),
-                        style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                          borderRadius: BorderRadius.circular(14),
-                          color: isDark ? AppTheme.darkCardElevated : Colors.white,
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<PaymentMode>(
-                            value: _paymentMode,
-                            isExpanded: true,
-                            items: [
-                              DropdownMenuItem(
-                                value: PaymentMode.cash,
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.money_rounded, size: 16, color: AppTheme.primaryGreen),
-                                    const SizedBox(width: 6),
-                                    Text(loc.tr('cash'), style: GoogleFonts.inter(fontSize: 13)),
-                                  ],
-                                ),
-                              ),
-                              DropdownMenuItem(
-                                value: PaymentMode.online,
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.account_balance_rounded, size: 16, color: Color(0xFF3B82F6)),
-                                    const SizedBox(width: 6),
-                                    Text(loc.tr('bank_transfer'), style: GoogleFonts.inter(fontSize: 13)),
-                                  ],
-                                ),
-                              ),
-                              DropdownMenuItem(
-                                value: PaymentMode.cheque,
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.fact_check_outlined, size: 16, color: Color(0xFF8B5CF6)),
-                                    const SizedBox(width: 6),
-                                    Text(loc.tr('cheque'), style: GoogleFonts.inter(fontSize: 13)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                            onChanged: (val) {
-                              if (val != null) setState(() => _paymentMode = val);
-                            },
+                child: Row(
+                  children: [
+                    const Icon(Icons.access_time_rounded, size: 20, color: AppTheme.primaryGreen),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            DateFormat('dd MMM yyyy • hh:mm a').format(_selectedDate),
+                            style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.bold),
                           ),
-                        ),
+                          Text(
+                            'Tap to change date or time (Defaults to current time)',
+                            style: GoogleFonts.inter(fontSize: 11, color: Colors.grey),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    const Icon(Icons.edit_calendar_rounded, size: 18, color: Colors.grey),
+                  ],
                 ),
-              ],
+              ),
             ),
             const SizedBox(height: 32),
             // Save Button
@@ -401,7 +360,7 @@ class _AddTransactionScreenState extends State<AddTransactionScreen> {
                     date: _selectedDate,
                     note: _noteController.text.trim(),
                     billNumber: _billNoController.text.trim(),
-                    paymentMode: _paymentMode,
+                    paymentMode: PaymentMode.cash,
                   );
 
                   Navigator.pop(context);
