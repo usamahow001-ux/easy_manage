@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EasyManage - Digital Khata, Ledger & Cashbook</title>
+  <style>
+    :root {
+      --primary: #0f766e;
+      --primary-dark: #134e4a;
+      --accent: #f59e0b;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text-main); line-height: 1.6; min-height: 100vh; display: flex; flex-direction: column; }
+    header { background: linear-gradient(135deg, var(--primary-dark), #0f172a); padding: 40px 20px; text-align: center; border-bottom: 1px solid var(--border); }
+    .logo-container { margin-bottom: 16px; }
+    .logo { width: 100px; height: 100px; border-radius: 22px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 2px solid var(--accent); }
+    h1 { font-size: 2.2rem; font-weight: 800; margin-bottom: 8px; color: #ffffff; }
+    .tagline { color: var(--accent); font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; }
+    .subtitle { color: var(--text-muted); max-width: 600px; margin: 0 auto; font-size: 0.95rem; }
+    .container { max-width: 850px; margin: 40px auto; padding: 0 20px; flex: 1; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; margin-bottom: 40px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 24px; transition: transform 0.2s ease; }
+    .card:hover { transform: translateY(-4px); }
+    .card-icon { font-size: 2rem; margin-bottom: 12px; }
+    .card h3 { color: #fff; font-size: 1.2rem; margin-bottom: 8px; }
+    .card p { color: var(--text-muted); font-size: 0.9rem; }
+    .links-bar { background: var(--card-bg); border: 1px solid var(--border); border-radius: 16px; padding: 24px; text-align: center; }
+    .btn { display: inline-block; padding: 12px 24px; margin: 8px; border-radius: 10px; text-decoration: none; font-weight: 600; font-size: 0.95rem; transition: all 0.2s; }
+    .btn-primary { background: var(--primary); color: #fff; border: 1px solid #14b8a6; }
+    .btn-primary:hover { background: #14b8a6; }
+    .btn-secondary { background: #334155; color: #fff; }
+    .btn-secondary:hover { background: #475569; }
+    footer { text-align: center; padding: 30px 20px; color: var(--text-muted); font-size: 0.85rem; border-top: 1px solid var(--border); margin-top: auto; }
+    footer a { color: var(--accent); text-decoration: none; margin: 0 10px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-container">
+      <img src="../assets/images/app_logo.png" alt="EasyManage Logo" class="logo" onerror="this.style.display='none'">
+    </div>
+    <h1>EasyManage</h1>
+    <div class="tagline">Smart Digital Khata, Cashbook & Customer Ledger</div>
+    <p class="subtitle">Secure, offline-first bookkeeping and 1-tap Google Drive cloud backup for businesses, merchants, and freelancers.</p>
+  </header>
+
+  <div class="container">
+    <div class="grid">
+      <div class="card">
+        <div class="card-icon">📒</div>
+        <h3>Digital Khata & Ledger</h3>
+        <p>Effortlessly track credit (Udhaar) and debit (Wasool) for customers and suppliers with instant transaction records.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">💵</div>
+        <h3>Cashbook & Daily In/Out</h3>
+        <p>Record daily cash inflow and outflow with automated daily balance and categorized cash tracking.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">☁️</div>
+        <h3>Private Google Drive Backup</h3>
+        <p>100% private data storage. Sync encrypted backups directly to your personal Google Drive account with 1-tap restore.</p>
+      </div>
+    </div>
+
+    <div class="links-bar">
+      <h3 style="margin-bottom: 16px;">Legal & Transparency</h3>
+      <a href="privacy-policy.html" class="btn btn-primary">📄 Read Privacy Policy</a>
+      <a href="terms.html" class="btn btn-secondary">📜 Terms of Service</a>
+    </div>
+  </div>
+
+  <footer>
+    <p>&copy; 2026 EasyManage. Developed by Usama Ali. All rights reserved.</p>
+    <p style="margin-top: 8px;">
+      <a href="privacy-policy.html">Privacy Policy</a> &bull;
+      <a href="terms.html">Terms of Service</a> &bull;
+      <a href="mailto:usamahow001@gmail.com">Developer Contact</a>
+    </p>
+  </footer>
+</body>
+</html>
