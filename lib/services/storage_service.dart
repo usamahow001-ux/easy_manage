@@ -17,6 +17,7 @@ class StorageService {
   static const String _kFirstRun = 'easymanage_first_run_v1';
   static const String _kDeletedItems = 'easymanage_deleted_items_v1';
   static const String _kCalculatorHistory = 'easymanage_calculator_history_v1';
+  static const String _kHideBalance = 'easymanage_hide_balance_v1';
 
   // Auth & Security & Cloud Keys
   static const String _kAuthLoggedIn = 'easymanage_auth_logged_in_v1';
@@ -249,6 +250,15 @@ class StorageService {
 
   Future<void> clearCalculatorHistory() async {
     await prefs.remove(_kCalculatorHistory);
+  }
+
+  // Balance Visibility Privacy
+  bool loadHideBalance() {
+    return prefs.getBool(_kHideBalance) ?? false;
+  }
+
+  Future<void> saveHideBalance(bool hide) async {
+    await prefs.setBool(_kHideBalance, hide);
   }
 
   // Complete Export

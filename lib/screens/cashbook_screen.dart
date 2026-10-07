@@ -37,18 +37,30 @@ class CashbookScreen extends StatelessWidget {
     return found['color'] as Color;
   }
 
+  String _getDateHeader(DateTime date) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final entryDate = DateTime(date.year, date.month, date.day);
+
+    if (entryDate == today) return 'Today • ${DateFormat('dd MMM yyyy').format(date)}';
+    if (entryDate == yesterday) return 'Yesterday • ${DateFormat('dd MMM yyyy').format(date)}';
+    return DateFormat('EEEE, dd MMM yyyy').format(date);
+  }
+
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<AppStateProvider>();
     final loc = provider.loc;
     final isDark = provider.isDarkMode;
+    final isHidden = provider.isBalanceHidden;
     final currency = provider.businessProfile.currencySymbol;
 
     final cashIn = provider.totalCashIn;
     final cashOut = provider.totalCashOut;
     final netCash = cashIn - cashOut;
     final entries = provider.getFilteredCashEntries();
-    final dateFormat = DateFormat('dd MMM yyyy • hh:mm a');
+    final timeFormat = DateFormat('hh:mm a');
 
     final totalVolume = cashIn + cashOut;
     final inRatio = totalVolume > 0 ? (cashIn / totalVolume) : 0.5;
@@ -102,7 +114,7 @@ class CashbookScreen extends StatelessWidget {
               border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -125,7 +137,9 @@ class CashbookScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '${netCash >= 0 ? "+" : "-"} $currency ${netCash.abs().toStringAsFixed(0)}',
+                      isHidden
+                          ? '••••••'
+                          : '${netCash >= 0 ? "+" : "-"} $currency ${netCash.abs().toStringAsFixed(0)}',
                       style: GoogleFonts.outfit(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -170,7 +184,7 @@ class CashbookScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '+ $currency ${cashIn.toStringAsFixed(0)}',
+                            isHidden ? '••••' : '+ $currency ${cashIn.toStringAsFixed(0)}',
                             style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.creditGreen),
                           ),
                         ],
@@ -189,7 +203,7 @@ class CashbookScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '- $currency ${cashOut.toStringAsFixed(0)}',
+                            isHidden ? '••••' : '- $currency ${cashOut.toStringAsFixed(0)}',
                             style: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.debitRed),
                           ),
                         ],
@@ -247,99 +261,129 @@ class CashbookScreen extends StatelessWidget {
                       final catIcon = _getCategoryIcon(item.category);
                       final catColor = _getCategoryColor(item.category);
 
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(9),
-                              decoration: BoxDecoration(
-                                color: catColor.withValues(alpha: 0.12),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                catIcon,
-                                color: catColor,
-                                size: 18,
+                      final showDateHeader = index == 0 ||
+                          _getDateHeader(entries[index - 1].date) != _getDateHeader(item.date);
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          if (showDateHeader)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(20, 10, 16, 4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppTheme.darkCardElevated : Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  _getDateHeader(item.date).toUpperCase(),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
+                          Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            decoration: BoxDecoration(
+                              color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(9),
+                                  decoration: BoxDecoration(
+                                    color: catColor.withValues(alpha: 0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    catIcon,
+                                    color: catColor,
+                                    size: 18,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text(
-                                        item.category,
-                                        style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+                                      Row(
+                                        children: [
+                                          Text(
+                                            item.category,
+                                            style: GoogleFonts.outfit(fontWeight: FontWeight.w600, fontSize: 14),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                            decoration: BoxDecoration(
+                                              color: color.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              isIn ? 'IN' : 'OUT',
+                                              style: GoogleFonts.inter(
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                                color: color,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      const SizedBox(width: 6),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                        decoration: BoxDecoration(
-                                          color: color.withValues(alpha: 0.1),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          isIn ? 'IN' : 'OUT',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
-                                            color: color,
+                                      if (item.note.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 2),
+                                          child: Text(
+                                            item.note,
+                                            style: GoogleFonts.inter(
+                                              fontSize: 12,
+                                              color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                                            ),
                                           ),
                                         ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        timeFormat.format(item.date),
+                                        style: GoogleFonts.inter(fontSize: 10, color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted),
                                       ),
                                     ],
                                   ),
-                                  if (item.note.isNotEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 2),
-                                      child: Text(
-                                        item.note,
-                                        style: GoogleFonts.inter(
-                                          fontSize: 12,
-                                          color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
-                                        ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      isHidden
+                                          ? '••••••'
+                                          : '${isIn ? "+" : "-"} $currency ${item.amount.toStringAsFixed(0)}',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                        color: color,
                                       ),
                                     ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    dateFormat.format(item.date),
-                                    style: GoogleFonts.inter(fontSize: 10, color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '${isIn ? "+" : "-"} $currency ${item.amount.toStringAsFixed(0)}',
-                                  style: GoogleFonts.outfit(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: color,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                InkWell(
-                                  onTap: () => _confirmDeleteCashEntry(context, provider, item, currency),
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(4),
-                                    child: Icon(Icons.delete_outline_rounded, size: 16, color: isDark ? Colors.white38 : Colors.black38),
-                                  ),
+                                    const SizedBox(height: 4),
+                                    InkWell(
+                                      onTap: () => _confirmDeleteCashEntry(context, provider, item, currency),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(4),
+                                        child: Icon(Icons.delete_outline_rounded, size: 16, color: isDark ? Colors.white38 : Colors.black38),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       );
                     },
                   ),

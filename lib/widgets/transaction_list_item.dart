@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import '../models/transaction.dart';
+import '../providers/app_state_provider.dart';
 import '../theme/app_theme.dart';
 
 class TransactionListItem extends StatelessWidget {
@@ -21,9 +23,9 @@ class TransactionListItem extends StatelessWidget {
   IconData _getPaymentIcon(PaymentMode mode) {
     switch (mode) {
       case PaymentMode.cash:
-        return Icons.money_rounded;
+        return Icons.payments_outlined;
       case PaymentMode.online:
-        return Icons.account_balance_rounded;
+        return Icons.account_balance_outlined;
       case PaymentMode.cheque:
         return Icons.fact_check_outlined;
     }
@@ -33,9 +35,10 @@ class TransactionListItem extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Transaction?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Delete Entry?'),
         content: Text(
-          'Delete transaction of $currency ${transaction.amount.toStringAsFixed(0)}? This will recalculate the contact balance.',
+          'Delete transaction of $currency ${transaction.amount.toStringAsFixed(0)}? The contact balance will be updated automatically.',
         ),
         actions: [
           TextButton(
@@ -43,7 +46,11 @@ class TransactionListItem extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.debitRed),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.debitRed,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
             onPressed: () {
               Navigator.pop(ctx);
               onDelete();
@@ -57,9 +64,11 @@ class TransactionListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final provider = context.watch<AppStateProvider>();
     final isGave = transaction.type == TransactionType.youGave;
     final color = isGave ? AppTheme.debitRed : AppTheme.creditGreen;
-    final dateFormat = DateFormat('dd MMM yyyy • hh:mm a');
+    final isHidden = provider.isBalanceHidden;
+    final timeFormat = DateFormat('hh:mm a');
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -71,6 +80,13 @@ class TransactionListItem extends StatelessWidget {
           color: isDarkMode ? AppTheme.darkBorder : AppTheme.lightBorder,
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDarkMode ? 0.2 : 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,7 +101,7 @@ class TransactionListItem extends StatelessWidget {
             child: Icon(
               isGave ? Icons.arrow_outward_rounded : Icons.arrow_downward_rounded,
               color: color,
-              size: 18,
+              size: 16,
             ),
           ),
           const SizedBox(width: 12),
@@ -129,25 +145,25 @@ class TransactionListItem extends StatelessWidget {
                   Text(
                     transaction.note,
                     style: GoogleFonts.inter(
-                      fontSize: 13,
+                      fontSize: 12.5,
                       color: isDarkMode ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
                     ),
                   ),
                 ],
                 const SizedBox(height: 5),
                 Wrap(
-                  spacing: 8,
+                  spacing: 6,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Text(
-                      dateFormat.format(transaction.date),
+                      timeFormat.format(transaction.date),
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: isDarkMode ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
                       ),
                     ),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                       decoration: BoxDecoration(
                         color: AppTheme.primaryGreen.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
@@ -179,9 +195,9 @@ class TransactionListItem extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                '${isGave ? "-" : "+"} $currency ${transaction.amount.toStringAsFixed(0)}',
+                isHidden ? '••••••' : '${isGave ? "-" : "+"} $currency ${transaction.amount.toStringAsFixed(0)}',
                 style: GoogleFonts.outfit(
-                  fontSize: 16,
+                  fontSize: 15.5,
                   fontWeight: FontWeight.bold,
                   color: color,
                 ),
@@ -194,7 +210,7 @@ class TransactionListItem extends StatelessWidget {
                   padding: const EdgeInsets.all(4),
                   child: Icon(
                     Icons.delete_outline_rounded,
-                    size: 16,
+                    size: 15,
                     color: isDarkMode ? Colors.white38 : Colors.black38,
                   ),
                 ),

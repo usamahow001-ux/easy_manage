@@ -1,3 +1,5 @@
+import '../services/phone_helper.dart';
+
 enum PartyType { customer, supplier }
 
 class Party {
@@ -10,6 +12,7 @@ class Party {
   final double openingBalance; // positive means they owe us, negative means we owe them
   final int avatarColorIndex;
   final String notes;
+  final DateTime? syncedAt;
 
   Party({
     required this.id,
@@ -21,7 +24,10 @@ class Party {
     this.openingBalance = 0.0,
     this.avatarColorIndex = 0,
     this.notes = '',
+    this.syncedAt,
   });
+
+  String get normalizedPhone => PhoneHelper.normalize(phone);
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -33,6 +39,7 @@ class Party {
         'openingBalance': openingBalance,
         'avatarColorIndex': avatarColorIndex,
         'notes': notes,
+        'syncedAt': syncedAt?.toIso8601String(),
       };
 
   factory Party.fromJson(Map<String, dynamic> json) => Party(
@@ -45,6 +52,7 @@ class Party {
         openingBalance: (json['openingBalance'] as num?)?.toDouble() ?? 0.0,
         avatarColorIndex: json['avatarColorIndex'] as int? ?? 0,
         notes: json['notes'] as String? ?? '',
+        syncedAt: json['syncedAt'] != null ? DateTime.tryParse(json['syncedAt']) : null,
       );
 
   Party copyWith({
@@ -57,6 +65,7 @@ class Party {
     double? openingBalance,
     int? avatarColorIndex,
     String? notes,
+    DateTime? syncedAt,
   }) {
     return Party(
       id: id ?? this.id,
@@ -68,6 +77,7 @@ class Party {
       openingBalance: openingBalance ?? this.openingBalance,
       avatarColorIndex: avatarColorIndex ?? this.avatarColorIndex,
       notes: notes ?? this.notes,
+      syncedAt: syncedAt ?? this.syncedAt,
     );
   }
 }

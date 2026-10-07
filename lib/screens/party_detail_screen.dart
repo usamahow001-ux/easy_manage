@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/party.dart';
 import '../models/transaction.dart';
 import '../providers/app_state_provider.dart';
@@ -36,9 +37,9 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     final yesterday = today.subtract(const Duration(days: 1));
     final txDate = DateTime(date.year, date.month, date.day);
 
-    if (txDate == today) return 'Today';
-    if (txDate == yesterday) return 'Yesterday';
-    return DateFormat('dd MMMM yyyy').format(date);
+    if (txDate == today) return 'Today • ${DateFormat('dd MMM yyyy').format(date)}';
+    if (txDate == yesterday) return 'Yesterday • ${DateFormat('dd MMM yyyy').format(date)}';
+    return DateFormat('EEEE, dd MMM yyyy').format(date);
   }
 
   @override
@@ -46,6 +47,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     final provider = context.watch<AppStateProvider>();
     final loc = provider.loc;
     final isDark = provider.isDarkMode;
+    final isHidden = provider.isBalanceHidden;
     final currency = provider.businessProfile.currencySymbol;
 
     final party = provider.parties.firstWhere(
@@ -101,9 +103,13 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
 
     String statusText = 'Account Settled (0)';
     if (isReceivable) {
-      statusText = '${loc.tr('you_will_get')} : $currency ${balance.abs().toStringAsFixed(0)}';
+      statusText = isHidden
+          ? '${loc.tr('you_will_get')} : ••••••'
+          : '${loc.tr('you_will_get')} : $currency ${balance.abs().toStringAsFixed(0)}';
     } else if (isPayable) {
-      statusText = '${loc.tr('you_will_give')} : $currency ${balance.abs().toStringAsFixed(0)}';
+      statusText = isHidden
+          ? '${loc.tr('you_will_give')} : ••••••'
+          : '${loc.tr('you_will_give')} : $currency ${balance.abs().toStringAsFixed(0)}';
     }
 
     return Scaffold(
@@ -113,12 +119,14 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           children: [
             Text(
               party.name,
-              style: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.bold),
+              style: GoogleFonts.outfit(fontSize: 17, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
             if (party.phone.isNotEmpty)
               Text(
                 party.phone,
-                style: GoogleFonts.inter(fontSize: 12, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
+                style: GoogleFonts.inter(fontSize: 11.5, color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary),
               ),
           ],
         ),
@@ -129,6 +137,16 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               tooltip: loc.tr('call'),
               onPressed: () => WhatsAppService.makePhoneCall(party.phone),
             ),
+          IconButton(
+            icon: const Icon(Icons.share_rounded, color: AppTheme.primaryGreen),
+            tooltip: 'Share Live Khata',
+            onPressed: () {
+              final link = provider.generateShareKhataLink(party);
+              final shareMsg = 'Dear ${party.name},\nView your live updated Khata with ${provider.businessProfile.businessName} anytime here:\n$link';
+              // ignore: deprecated_member_use
+              Share.share(shareMsg, subject: 'Live Khata Link');
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_rounded, color: AppTheme.primaryGreen),
             tooltip: loc.tr('pdf_statement'),
@@ -148,11 +166,26 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (val) {
-              if (val == 'delete') {
+              if (val == 'share_khata') {
+                final link = provider.generateShareKhataLink(party);
+                final shareMsg = 'Dear ${party.name},\nView your live updated Khata with ${provider.businessProfile.businessName} anytime here:\n$link';
+                // ignore: deprecated_member_use
+                Share.share(shareMsg, subject: 'Live Khata Link');
+              } else if (val == 'delete') {
                 _confirmDeleteParty(context, provider, party);
               }
             },
             itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'share_khata',
+                child: Row(
+                  children: [
+                    Icon(Icons.share_rounded, color: AppTheme.primaryGreen, size: 20),
+                    SizedBox(width: 8),
+                    Text('Share Live Khata Link'),
+                  ],
+                ),
+              ),
               PopupMenuItem(
                 value: 'delete',
                 child: Row(
@@ -171,7 +204,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
         children: [
           // Balance Banner & Action Chips
           Container(
-            margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+            margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               color: isDark ? AppTheme.darkCard : AppTheme.lightCard,
@@ -179,7 +212,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
               border: Border.all(color: statusColor.withValues(alpha: 0.35), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+                  color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.03),
                   blurRadius: 10,
                   offset: const Offset(0, 3),
                 ),
@@ -193,7 +226,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                     Text(
                       loc.tr('net_balance'),
                       style: GoogleFonts.inter(
-                        fontSize: 13,
+                        fontSize: 12.5,
                         color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
                       ),
                     ),
@@ -246,7 +279,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                     ],
                   ),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 const Divider(height: 1),
                 const SizedBox(height: 10),
                 Row(
@@ -254,10 +287,10 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                     if (party.phone.isNotEmpty) ...[
                       Expanded(
                         child: OutlinedButton.icon(
-                          icon: const Icon(Icons.mark_chat_unread_rounded, color: Color(0xFF25D366), size: 16),
+                          icon: const Icon(Icons.mark_chat_unread_rounded, color: Color(0xFF25D366), size: 15),
                           label: FittedBox(
                             fit: BoxFit.scaleDown,
-                            child: Text('WhatsApp', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                            child: Text('WhatsApp', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
                           ),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: isDark ? Colors.white : Colors.black87,
@@ -278,10 +311,10 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: OutlinedButton.icon(
-                          icon: const Icon(Icons.sms_outlined, color: AppTheme.primaryGreen, size: 16),
+                          icon: const Icon(Icons.sms_outlined, color: AppTheme.primaryGreen, size: 15),
                           label: FittedBox(
                             fit: BoxFit.scaleDown,
-                            child: Text('SMS', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                            child: Text('SMS', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
                           ),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: isDark ? Colors.white : Colors.black87,
@@ -303,10 +336,10 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                     ],
                     Expanded(
                       child: OutlinedButton.icon(
-                        icon: const Icon(Icons.share_outlined, color: AppTheme.primaryGreen, size: 16),
+                        icon: const Icon(Icons.share_outlined, color: AppTheme.primaryGreen, size: 15),
                         label: FittedBox(
                           fit: BoxFit.scaleDown,
-                          child: Text('PDF Report', style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600)),
+                          child: Text('PDF Report', style: GoogleFonts.inter(fontSize: 11.5, fontWeight: FontWeight.w600)),
                         ),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: isDark ? Colors.white : Colors.black87,
@@ -355,7 +388,7 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.receipt_long_outlined, size: 56, color: Colors.grey.withValues(alpha: 0.4)),
+                          Icon(Icons.receipt_long_outlined, size: 52, color: Colors.grey.withValues(alpha: 0.35)),
                           const SizedBox(height: 8),
                           Text(
                             loc.tr('no_transactions'),
@@ -384,12 +417,20 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
                           if (showDateHeader)
                             Padding(
                               padding: const EdgeInsets.fromLTRB(20, 12, 16, 4),
-                              child: Text(
-                                _getDateHeader(tx.date),
-                                style: GoogleFonts.outfit(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: isDark ? AppTheme.darkCardElevated : Colors.grey.shade200,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  _getDateHeader(tx.date).toUpperCase(),
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                                    letterSpacing: 0.5,
+                                  ),
                                 ),
                               ),
                             ),

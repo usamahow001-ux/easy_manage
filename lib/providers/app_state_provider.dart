@@ -6,17 +6,21 @@ import '../models/cash_entry.dart';
 import '../models/business_profile.dart';
 import '../models/deleted_item.dart';
 import '../models/calculation_record.dart';
+import '../models/customer_shop_khata.dart';
 import '../services/storage_service.dart';
 import '../services/google_drive_service.dart';
+import '../services/cloud_sync_service.dart';
 import '../l10n/app_localizations.dart';
 
 enum PartyFilter { all, pendingOnly, clearedOnly }
 enum PartySort { recent, name, balanceHigh }
 enum TimePeriod { all, today, thisWeek, thisMonth }
+enum AppMode { shopkeeper, customer }
 
 class AppStateProvider extends ChangeNotifier {
   final StorageService storageService;
   late final GoogleDriveService googleDriveService;
+  late final CloudSyncService cloudSyncService;
 
   List<Party> _parties = [];
   List<KhataTransaction> _transactions = [];
@@ -24,6 +28,12 @@ class AppStateProvider extends ChangeNotifier {
   List<DeletedItem> _deletedItems = [];
   List<CalculationRecord> _calculatorHistory = [];
   BusinessProfile _businessProfile = BusinessProfile();
+
+  // App Mode & Customer Portal state
+  AppMode _appMode = AppMode.shopkeeper;
+  String _customerPhoneNumber = '';
+  List<CustomerShopKhata> _customerKhatas = [];
+  bool _isLoadingCustomerKhatas = false;
 
   // Auth & Cloud state
   bool _isLoggedIn = true;
@@ -38,6 +48,7 @@ class AppStateProvider extends ChangeNotifier {
 
   AppLanguage _language = AppLanguage.english;
   bool _isDarkMode = false;
+  bool _isBalanceHidden = false;
   String _searchQuery = '';
   PartyFilter _partyFilter = PartyFilter.all;
   PartySort _partySort = PartySort.recent;
@@ -45,10 +56,17 @@ class AppStateProvider extends ChangeNotifier {
 
   AppStateProvider(this.storageService) {
     googleDriveService = GoogleDriveService(storageService.prefs);
+    cloudSyncService = CloudSyncService(storageService.prefs);
+    _customerPhoneNumber = cloudSyncService.getSavedCustomerPhone() ?? '';
     _loadAllData();
   }
 
   // Getters
+  AppMode get appMode => _appMode;
+  String get customerPhoneNumber => _customerPhoneNumber;
+  List<CustomerShopKhata> get customerKhatas => _customerKhatas;
+  bool get isLoadingCustomerKhatas => _isLoadingCustomerKhatas;
+
   List<Party> get parties => _parties;
   List<KhataTransaction> get transactions => _transactions;
   List<CashEntry> get cashEntries => _cashEntries;
@@ -57,6 +75,7 @@ class AppStateProvider extends ChangeNotifier {
   BusinessProfile get businessProfile => _businessProfile;
   AppLanguage get language => _language;
   bool get isDarkMode => _isDarkMode;
+  bool get isBalanceHidden => _isBalanceHidden;
   String get searchQuery => _searchQuery;
   PartyFilter get partyFilter => _partyFilter;
   PartySort get partySort => _partySort;
@@ -124,6 +143,7 @@ class AppStateProvider extends ChangeNotifier {
       _language = AppLanguage.english;
     }
     _isDarkMode = storageService.loadDarkMode();
+    _isBalanceHidden = storageService.loadHideBalance();
     notifyListeners();
   }
 
@@ -144,6 +164,12 @@ class AppStateProvider extends ChangeNotifier {
 
   void setCashPeriod(TimePeriod period) {
     _cashPeriod = period;
+    notifyListeners();
+  }
+
+  Future<void> toggleBalanceVisibility() async {
+    _isBalanceHidden = !_isBalanceHidden;
+    await storageService.saveHideBalance(_isBalanceHidden);
     notifyListeners();
   }
 
@@ -289,24 +315,75 @@ class AppStateProvider extends ChangeNotifier {
 
   // Cloud Sync & Verification
   Future<void> syncToCloud() async {
-    if (_userIdentifier.isEmpty) return;
-    final payload = {
-      'syncedAt': DateTime.now().toIso8601String(),
-      'identifier': _userIdentifier,
-      'business': _businessProfile.toJson(),
-      'parties': _parties.map((p) => p.toJson()).toList(),
-      'transactions': _transactions.map((t) => t.toJson()).toList(),
-      'cashEntries': _cashEntries.map((c) => c.toJson()).toList(),
-      'deletedItems': _deletedItems.map((d) => d.toJson()).toList(),
-    };
-    await storageService.saveCloudVault(_userIdentifier, payload);
+    await cloudSyncService.syncShopkeeperData(
+      business: _businessProfile,
+      parties: _parties,
+      transactions: _transactions,
+    );
+
+    if (_userIdentifier.isNotEmpty) {
+      final payload = {
+        'syncedAt': DateTime.now().toIso8601String(),
+        'identifier': _userIdentifier,
+        'business': _businessProfile.toJson(),
+        'parties': _parties.map((p) => p.toJson()).toList(),
+        'transactions': _transactions.map((t) => t.toJson()).toList(),
+        'cashEntries': _cashEntries.map((c) => c.toJson()).toList(),
+        'deletedItems': _deletedItems.map((d) => d.toJson()).toList(),
+      };
+      await storageService.saveCloudVault(_userIdentifier, payload);
+    }
+
     _lastSyncTime = DateTime.now();
     await storageService.updateLastSyncTime();
 
     if (googleDriveService.isAutoBackupEnabled) {
       await backupToGoogleDrive();
     }
+
+    if (_appMode == AppMode.customer && _customerPhoneNumber.isNotEmpty) {
+      await refreshCustomerKhatas();
+    }
+
     notifyListeners();
+  }
+
+  // App Mode & Customer Portal Management
+  void setAppMode(AppMode mode) {
+    _appMode = mode;
+    if (mode == AppMode.customer && _customerPhoneNumber.isNotEmpty) {
+      refreshCustomerKhatas();
+    }
+    notifyListeners();
+  }
+
+  Future<void> setCustomerPhoneNumber(String phone) async {
+    _customerPhoneNumber = phone;
+    await refreshCustomerKhatas();
+    notifyListeners();
+  }
+
+  Future<void> refreshCustomerKhatas() async {
+    if (_customerPhoneNumber.isEmpty) return;
+    _isLoadingCustomerKhatas = true;
+    notifyListeners();
+
+    await cloudSyncService.syncShopkeeperData(
+      business: _businessProfile,
+      parties: _parties,
+      transactions: _transactions,
+    );
+
+    _customerKhatas = await cloudSyncService.fetchCustomerKhatas(_customerPhoneNumber);
+    _isLoadingCustomerKhatas = false;
+    notifyListeners();
+  }
+
+  String generateShareKhataLink(Party party) {
+    return cloudSyncService.generateShareKhataLink(
+      business: _businessProfile,
+      party: party,
+    );
   }
 
   // Login & Restore Flow

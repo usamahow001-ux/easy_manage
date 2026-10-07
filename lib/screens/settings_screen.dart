@@ -169,6 +169,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
+          // Dual-Mode Switcher: Customer Portal Tile
+          _buildSectionHeader('Switch Role', isDark),
+          const SizedBox(height: 8),
+          _buildSettingsTile(
+            icon: Icons.person_pin_rounded,
+            iconColor: AppTheme.primaryGreen,
+            title: 'Customer Khata Portal',
+            subtitle: 'View your personal balances & live ledgers with other shops',
+            isDark: isDark,
+            trailing: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryGreen.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Open',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.primaryGreen,
+                    ),
+                  ),
+                  SizedBox(width: 2),
+                  Icon(Icons.chevron_right_rounded, size: 16, color: AppTheme.primaryGreen),
+                ],
+              ),
+            ),
+            onTap: () {
+              provider.setAppMode(AppMode.customer);
+            },
+          ),
+          const SizedBox(height: 20),
+
           // WhatsApp Style Google Drive Backup Tile
           _buildSectionHeader(loc.tr('cloud_backup_title'), isDark),
           const SizedBox(height: 8),

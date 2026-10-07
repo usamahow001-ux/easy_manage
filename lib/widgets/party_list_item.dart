@@ -30,16 +30,20 @@ class PartyListItem extends StatelessWidget {
   String _formatRelativeTime(DateTime? dt) {
     if (dt == null) return '';
     final now = DateTime.now();
-    final difference = now.difference(dt);
+    final today = DateTime(now.year, now.month, now.day);
+    final itemDate = DateTime(dt.year, dt.month, dt.day);
+    final diffDays = today.difference(itemDate).inDays;
 
-    if (difference.inMinutes < 60) {
-      return difference.inMinutes <= 1 ? 'Just now' : '${difference.inMinutes}m ago';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours}h ago';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays}d ago';
+    if (diffDays == 0) {
+      return 'Today • ${DateFormat('hh:mm a').format(dt)}';
+    } else if (diffDays == 1) {
+      return 'Yesterday • ${DateFormat('hh:mm a').format(dt)}';
+    } else if (diffDays < 7) {
+      return '${DateFormat('EEE').format(dt)} • ${DateFormat('hh:mm a').format(dt)}';
+    } else if (dt.year == now.year) {
+      return DateFormat('dd MMM • hh:mm a').format(dt);
     } else {
-      return DateFormat('dd MMM').format(dt);
+      return DateFormat('dd MMM yyyy').format(dt);
     }
   }
 
@@ -51,6 +55,7 @@ class PartyListItem extends StatelessWidget {
     final currency = provider.businessProfile.currencySymbol;
     final loc = provider.loc;
     final isDark = provider.isDarkMode;
+    final isHidden = provider.isBalanceHidden;
 
     final colorIndex = party.avatarColorIndex % avatarColors.length;
     final avatarColor = avatarColors[colorIndex];
@@ -96,7 +101,7 @@ class PartyListItem extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -118,20 +123,20 @@ class PartyListItem extends StatelessWidget {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [avatarColor.withValues(alpha: 0.8), avatarColor.withValues(alpha: 0.3)],
+                      colors: [avatarColor.withValues(alpha: 0.8), avatarColor.withValues(alpha: 0.25)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                   ),
                   child: CircleAvatar(
-                    radius: 22,
-                    backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+                    radius: 21,
+                    backgroundColor: isDark ? AppTheme.darkCardElevated : Colors.white,
                     child: Text(
                       initials,
                       style: GoogleFonts.outfit(
                         color: avatarColor,
                         fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                        fontSize: 13.5,
                       ),
                     ),
                   ),
@@ -156,14 +161,6 @@ class PartyListItem extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          if (lastActive != null)
-                            Text(
-                              _formatRelativeTime(lastActive),
-                              style: GoogleFonts.inter(
-                                fontSize: 10,
-                                color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
-                              ),
-                            ),
                         ],
                       ),
                       const SizedBox(height: 3),
@@ -172,15 +169,15 @@ class PartyListItem extends StatelessWidget {
                           if (party.phone.isNotEmpty) ...[
                             Icon(
                               Icons.phone_iphone_rounded,
-                              size: 13,
-                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                              size: 12,
+                              color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
                             ),
                             const SizedBox(width: 3),
                             Expanded(
                               child: Text(
                                 party.phone,
                                 style: GoogleFonts.inter(
-                                  fontSize: 12,
+                                  fontSize: 11.5,
                                   color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
                                 ),
                                 maxLines: 1,
@@ -200,18 +197,42 @@ class PartyListItem extends StatelessWidget {
                           ],
                         ],
                       ),
+                      if (lastActive != null) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.access_time_rounded,
+                              size: 11,
+                              color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                _formatRelativeTime(lastActive),
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  color: isDark ? AppTheme.darkTextMuted : AppTheme.lightTextMuted,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
                 // Balance & Status Pill
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      '$currency ${balance.abs().toStringAsFixed(0)}',
+                      isHidden ? '••••••' : '$currency ${balance.abs().toStringAsFixed(0)}',
                       style: GoogleFonts.outfit(
-                        fontSize: 16,
+                        fontSize: 15.5,
                         fontWeight: FontWeight.bold,
                         color: statusColor,
                       ),
@@ -235,7 +256,7 @@ class PartyListItem extends StatelessWidget {
                   ],
                 ),
                 if (party.phone.isNotEmpty && isReceivable) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   IconButton(
                     icon: Container(
                       padding: const EdgeInsets.all(6),
@@ -243,7 +264,7 @@ class PartyListItem extends StatelessWidget {
                         color: const Color(0xFF25D366).withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.mark_chat_unread_rounded, color: Color(0xFF25D366), size: 16),
+                      child: const Icon(Icons.mark_chat_unread_rounded, color: Color(0xFF25D366), size: 15),
                     ),
                     tooltip: 'Send WhatsApp Reminder',
                     onPressed: () {
@@ -255,7 +276,7 @@ class PartyListItem extends StatelessWidget {
                       );
                     },
                     padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
                   ),
                 ],
               ],

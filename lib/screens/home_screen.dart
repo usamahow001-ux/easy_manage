@@ -13,6 +13,7 @@ import 'cashbook_screen.dart';
 import 'calculator_screen.dart';
 import 'settings_screen.dart';
 import 'language_selection_screen.dart';
+import 'customer_home_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -44,6 +45,10 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final provider = context.watch<AppStateProvider>();
     final loc = provider.loc;
     final isDark = provider.isDarkMode;
+
+    if (provider.appMode == AppMode.customer) {
+      return const CustomerHomeScreen();
+    }
 
     final screens = [
       _buildKhataView(provider, loc, isDark),
@@ -129,37 +134,77 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                     ),
                     const SizedBox(width: 12),
+                    // Interactive Role Switcher Selector
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            provider.businessProfile.businessName.isNotEmpty
-                                ? provider.businessProfile.businessName
-                                : loc.tr('app_name'),
-                            style: GoogleFonts.outfit(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                      child: InkWell(
+                        onTap: () => _showRoleSwitchModal(context, provider),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isDark ? AppTheme.darkCardElevated : AppTheme.lightCardElevated,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
                           ),
-                          Text(
-                            loc.tr('app_tagline'),
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                            ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.storefront_rounded, size: 15, color: AppTheme.primaryGreen),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Flexible(
+                                          child: Text(
+                                            'Shopkeeper Mode',
+                                            style: GoogleFonts.outfit(
+                                              fontSize: 13,
+                                              fontWeight: FontWeight.bold,
+                                              color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppTheme.primaryGreen),
+                                      ],
+                                    ),
+                                    Text(
+                                      provider.businessProfile.businessName.isNotEmpty && provider.businessProfile.businessName != 'My Business'
+                                          ? provider.businessProfile.businessName
+                                          : 'Tap to switch role',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
                       ),
                     ),
+                    const SizedBox(width: 6),
                     // Language Switcher Button
                     IconButton(
                       tooltip: loc.tr('select_language'),
                       icon: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
                         decoration: BoxDecoration(
                           color: AppTheme.primaryGreen.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
@@ -197,8 +242,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
             ),
             // Quick Stats Banner
-            const SliverToBoxAdapter(
-              child: QuickStatsBar(),
+            SliverToBoxAdapter(
+              child: QuickStatsBar(
+                onOpenCashbook: () {
+                  setState(() => _currentNavIndex = 1);
+                },
+              ),
             ),
             // Search Bar & Filter Chips
             SliverToBoxAdapter(
@@ -463,6 +512,181 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
             );
           },
+        );
+      },
+    );
+  }
+
+  void _showRoleSwitchModal(BuildContext context, AppStateProvider provider) {
+    final isDark = provider.isDarkMode;
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Select Active Role',
+                  style: GoogleFonts.outfit(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Switch between managing your business and viewing your customer accounts.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                // Shopkeeper Mode Option
+                InkWell(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    provider.setAppMode(AppMode.shopkeeper);
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: provider.appMode == AppMode.shopkeeper
+                          ? AppTheme.primaryGreen.withValues(alpha: 0.12)
+                          : (isDark ? AppTheme.darkCardElevated : AppTheme.lightCardElevated),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: provider.appMode == AppMode.shopkeeper
+                            ? AppTheme.primaryGreen
+                            : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.storefront_rounded, color: AppTheme.primaryGreen, size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Shopkeeper Mode',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                                ),
+                              ),
+                              Text(
+                                provider.businessProfile.businessName.isNotEmpty && provider.businessProfile.businessName != 'My Business'
+                                    ? provider.businessProfile.businessName
+                                    : 'Manage your customers, suppliers & cashbook',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (provider.appMode == AppMode.shopkeeper)
+                          const Icon(Icons.check_circle_rounded, color: AppTheme.primaryGreen, size: 22),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Customer Mode Option
+                InkWell(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    provider.setAppMode(AppMode.customer);
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: provider.appMode == AppMode.customer
+                          ? AppTheme.primaryGreen.withValues(alpha: 0.12)
+                          : (isDark ? AppTheme.darkCardElevated : AppTheme.lightCardElevated),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: provider.appMode == AppMode.customer
+                            ? AppTheme.primaryGreen
+                            : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: 0.15),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.person_pin_rounded, color: Colors.blue, size: 24),
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Customer Mode',
+                                style: GoogleFonts.outfit(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                                ),
+                              ),
+                              Text(
+                                'View shared Khatas & live statements from shops',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (provider.appMode == AppMode.customer)
+                          const Icon(Icons.check_circle_rounded, color: AppTheme.primaryGreen, size: 22),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );

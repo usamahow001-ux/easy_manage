@@ -11,6 +11,8 @@ class KhataTransaction {
   final String billNumber;
   final PaymentMode paymentMode;
   final String? imagePath;
+  final DateTime? syncedAt;
+  final DateTime? updatedAt;
 
   KhataTransaction({
     required this.id,
@@ -22,6 +24,8 @@ class KhataTransaction {
     this.billNumber = '',
     this.paymentMode = PaymentMode.cash,
     this.imagePath,
+    this.syncedAt,
+    this.updatedAt,
   });
 
   Map<String, dynamic> toJson() => {
@@ -34,6 +38,8 @@ class KhataTransaction {
         'billNumber': billNumber,
         'paymentMode': paymentMode.name,
         'imagePath': imagePath,
+        'syncedAt': syncedAt?.toIso8601String(),
+        'updatedAt': updatedAt?.toIso8601String(),
       };
 
   factory KhataTransaction.fromJson(Map<String, dynamic> json) => KhataTransaction(
@@ -49,6 +55,8 @@ class KhataTransaction {
           orElse: () => PaymentMode.cash,
         ),
         imagePath: json['imagePath'] as String?,
+        syncedAt: json['syncedAt'] != null ? DateTime.tryParse(json['syncedAt']) : null,
+        updatedAt: json['updatedAt'] != null ? DateTime.tryParse(json['updatedAt']) : null,
       );
 
   KhataTransaction copyWith({
@@ -61,6 +69,8 @@ class KhataTransaction {
     String? billNumber,
     PaymentMode? paymentMode,
     String? imagePath,
+    DateTime? syncedAt,
+    DateTime? updatedAt,
   }) {
     return KhataTransaction(
       id: id ?? this.id,
@@ -72,6 +82,8 @@ class KhataTransaction {
       billNumber: billNumber ?? this.billNumber,
       paymentMode: paymentMode ?? this.paymentMode,
       imagePath: imagePath ?? this.imagePath,
+      syncedAt: syncedAt ?? this.syncedAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
