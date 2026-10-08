@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "869352720601",
+    "project_id": "easy-manage-live",
+    "storage_bucket": "easy-manage-live.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:869352720601:android:df1e02e2ad44c4571116c8",
+        "android_client_info": {
+          "package_name": "com.easymanage.khata.live"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4yxdntSBUCe54L3GuBHnNY_dUIiCwVu4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

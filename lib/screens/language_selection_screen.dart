@@ -5,6 +5,7 @@ import '../l10n/app_localizations.dart';
 import '../providers/app_state_provider.dart';
 import '../theme/app_theme.dart';
 import 'home_screen.dart';
+import 'phone_auth_screen.dart';
 
 class LanguageSelectionScreen extends StatefulWidget {
   final bool isFirstTime;
@@ -41,7 +42,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
     if (!mounted) return;
 
     if (widget.isFirstTime) {
-      const nextScreen = HomeScreen();
+      final nextScreen = provider.isLoggedIn ? const HomeScreen() : const PhoneAuthScreen();
 
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(

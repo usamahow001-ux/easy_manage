@@ -7,6 +7,7 @@ import '../theme/app_theme.dart';
 import 'home_screen.dart';
 import 'app_lock_screen.dart';
 import 'language_selection_screen.dart';
+import 'phone_auth_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -61,6 +62,8 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     Widget targetScreen;
     if (!provider.hasSelectedLanguage) {
       targetScreen = const LanguageSelectionScreen(isFirstTime: true);
+    } else if (!provider.isLoggedIn) {
+      targetScreen = const PhoneAuthScreen();
     } else if (provider.isAppLockEnabled && !provider.isAppUnlocked) {
       targetScreen = const AppLockScreen();
     } else {

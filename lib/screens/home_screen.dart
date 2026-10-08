@@ -13,7 +13,7 @@ import 'cashbook_screen.dart';
 import 'calculator_screen.dart';
 import 'settings_screen.dart';
 import 'language_selection_screen.dart';
-import 'customer_home_screen.dart';
+import 'customer_ledger_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -45,10 +45,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final provider = context.watch<AppStateProvider>();
     final loc = provider.loc;
     final isDark = provider.isDarkMode;
-
-    if (provider.appMode == AppMode.customer) {
-      return const CustomerHomeScreen();
-    }
 
     final screens = [
       _buildKhataView(provider, loc, isDark),
@@ -134,72 +130,56 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                       ),
                     ),
                     const SizedBox(width: 12),
-                    // Interactive Role Switcher Selector
+                    // Business Title
                     Expanded(
-                      child: InkWell(
-                        onTap: () => _showRoleSwitchModal(context, provider),
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isDark ? AppTheme.darkCardElevated : AppTheme.lightCardElevated,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppTheme.primaryGreen.withValues(alpha: 0.3)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            provider.businessProfile.businessName.isNotEmpty &&
+                                    provider.businessProfile.businessName != 'My Business'
+                                ? provider.businessProfile.businessName
+                                : 'Easy Manage',
+                            style: GoogleFonts.outfit(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          child: Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.primaryGreen.withValues(alpha: 0.15),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.storefront_rounded, size: 15, color: AppTheme.primaryGreen),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            'Shopkeeper Mode',
-                                            style: GoogleFonts.outfit(
-                                              fontSize: 13,
-                                              fontWeight: FontWeight.bold,
-                                              color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 2),
-                                        const Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppTheme.primaryGreen),
-                                      ],
-                                    ),
-                                    Text(
-                                      provider.businessProfile.businessName.isNotEmpty && provider.businessProfile.businessName != 'My Business'
-                                          ? provider.businessProfile.businessName
-                                          : 'Tap to switch role',
-                                      style: GoogleFonts.inter(
-                                        fontSize: 10,
-                                        color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
+                          Text(
+                            provider.businessProfile.ownerName.isNotEmpty
+                                ? provider.businessProfile.ownerName
+                                : (provider.businessProfile.phone.isNotEmpty
+                                    ? provider.businessProfile.phone
+                                    : 'Digital Khata & Ledger'),
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        ),
+                        ],
                       ),
                     ),
-                    const SizedBox(width: 6),
+                    // Notification Bell for Pending Khatas
+                    if (provider.customerKhatas.isNotEmpty) ...[
+                      IconButton(
+                        tooltip: 'Pending Khatas (${provider.customerKhatas.length})',
+                        icon: Badge(
+                          label: Text(
+                            '${provider.customerKhatas.length}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          backgroundColor: AppTheme.debitRed,
+                          child: const Icon(Icons.notifications_active_rounded, color: Color(0xFFF59E0B)),
+                        ),
+                        onPressed: () => _showPendingKhatasModal(context, provider),
+                      ),
+                    ],
                     // Language Switcher Button
                     IconButton(
                       tooltip: loc.tr('select_language'),
@@ -249,6 +229,86 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 },
               ),
             ),
+            // Pending Khata Notification Banner (When other shops have added this user)
+            if (provider.customerKhatas.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                  child: InkWell(
+                    onTap: () => _showPendingKhatasModal(context, provider),
+                    borderRadius: BorderRadius.circular(14),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0xFFF59E0B), width: 1.2),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.amber.withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFF59E0B),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 18),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Pending Khata Notification',
+                                      style: GoogleFonts.outfit(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.bold,
+                                        color: const Color(0xFF92400E),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFD97706),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '${provider.customerKhatas.length} New',
+                                        style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  '${provider.customerKhatas.first.shopName} added you. Tap to view your live balance & statements.',
+                                  style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFFB45309)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: Color(0xFF92400E)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             // Search Bar & Filter Chips
             SliverToBoxAdapter(
               child: Padding(
@@ -517,10 +577,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
-  void _showRoleSwitchModal(BuildContext context, AppStateProvider provider) {
+  void _showPendingKhatasModal(BuildContext context, AppStateProvider provider) {
     final isDark = provider.isDarkMode;
+    final khatas = provider.customerKhatas;
+
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -544,146 +607,118 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Select Active Role',
-                  style: GoogleFonts.outfit(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Switch between managing your business and viewing your customer accounts.',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                  ),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.notifications_active_rounded, color: Color(0xFFF59E0B), size: 22),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Pending Khatas from Shops',
+                            style: GoogleFonts.outfit(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                            ),
+                          ),
+                          Text(
+                            '${khatas.length} shop(s) have registered active ledgers for your phone number',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 18),
-                // Shopkeeper Mode Option
-                InkWell(
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    provider.setAppMode(AppMode.shopkeeper);
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: provider.appMode == AppMode.shopkeeper
-                          ? AppTheme.primaryGreen.withValues(alpha: 0.12)
-                          : (isDark ? AppTheme.darkCardElevated : AppTheme.lightCardElevated),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: provider.appMode == AppMode.shopkeeper
-                            ? AppTheme.primaryGreen
-                            : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                        width: 1.5,
+                if (khatas.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 24),
+                    child: Center(
+                      child: Text(
+                        'No pending khatas at the moment.',
+                        style: GoogleFonts.inter(color: Colors.grey),
                       ),
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
+                  )
+                else
+                  Flexible(
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: khatas.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 10),
+                      itemBuilder: (context, index) {
+                        final khata = khatas[index];
+                        final isDebit = khata.netBalance > 0; // Customer owes money
+                        return Container(
                           decoration: BoxDecoration(
-                            color: AppTheme.primaryGreen.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
+                            color: isDark ? AppTheme.darkCardElevated : AppTheme.lightCardElevated,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                            ),
                           ),
-                          child: const Icon(Icons.storefront_rounded, color: AppTheme.primaryGreen, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Shopkeeper Mode',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
+                          child: ListTile(
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            leading: CircleAvatar(
+                              backgroundColor: AppTheme.primaryGreen.withValues(alpha: 0.15),
+                              child: const Icon(Icons.storefront_rounded, color: AppTheme.primaryGreen),
+                            ),
+                            title: Text(
+                              khata.shopName.isNotEmpty ? khata.shopName : 'Shop Ledger',
+                              style: GoogleFonts.outfit(fontWeight: FontWeight.bold, fontSize: 15),
+                            ),
+                            subtitle: Text(
+                              khata.shopPhone.isNotEmpty ? khata.shopPhone : 'Live Shared Khata',
+                              style: GoogleFonts.inter(fontSize: 12, color: Colors.grey),
+                            ),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'Rs ${khata.netBalance.abs().toStringAsFixed(0)}',
+                                  style: GoogleFonts.outfit(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: isDebit ? AppTheme.debitRed : AppTheme.creditGreen,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                provider.businessProfile.businessName.isNotEmpty && provider.businessProfile.businessName != 'My Business'
-                                    ? provider.businessProfile.businessName
-                                    : 'Manage your customers, suppliers & cashbook',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
+                                Text(
+                                  isDebit ? 'You Owe (Dena Hai)' : 'You Advance (Lena Hai)',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDebit ? AppTheme.debitRed : AppTheme.creditGreen,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
+                            onTap: () {
+                              Navigator.pop(ctx);
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => CustomerLedgerScreen(khata: khata),
+                                ),
+                              );
+                            },
                           ),
-                        ),
-                        if (provider.appMode == AppMode.shopkeeper)
-                          const Icon(Icons.check_circle_rounded, color: AppTheme.primaryGreen, size: 22),
-                      ],
+                        );
+                      },
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                // Customer Mode Option
-                InkWell(
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    provider.setAppMode(AppMode.customer);
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: provider.appMode == AppMode.customer
-                          ? AppTheme.primaryGreen.withValues(alpha: 0.12)
-                          : (isDark ? AppTheme.darkCardElevated : AppTheme.lightCardElevated),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: provider.appMode == AppMode.customer
-                            ? AppTheme.primaryGreen
-                            : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withValues(alpha: 0.15),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.person_pin_rounded, color: Colors.blue, size: 24),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Customer Mode',
-                                style: GoogleFonts.outfit(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: isDark ? AppTheme.darkTextPrimary : AppTheme.lightTextPrimary,
-                                ),
-                              ),
-                              Text(
-                                'View shared Khatas & live statements from shops',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: isDark ? AppTheme.darkTextSecondary : AppTheme.lightTextSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (provider.appMode == AppMode.customer)
-                          const Icon(Icons.check_circle_rounded, color: AppTheme.primaryGreen, size: 22),
-                      ],
-                    ),
-                  ),
-                ),
               ],
             ),
           ),

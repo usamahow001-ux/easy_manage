@@ -6,9 +6,8 @@ import '../l10n/app_localizations.dart';
 import '../theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'recycle_bin_screen.dart';
-import 'chat_backup_screen.dart';
 import 'language_selection_screen.dart';
-import 'reports_screen.dart';
+import 'splash_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -169,77 +168,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Dual-Mode Switcher: Customer Portal Tile
-          _buildSectionHeader('Switch Role', isDark),
-          const SizedBox(height: 8),
-          _buildSettingsTile(
-            icon: Icons.person_pin_rounded,
-            iconColor: AppTheme.primaryGreen,
-            title: 'Customer Khata Portal',
-            subtitle: 'View your personal balances & live ledgers with other shops',
-            isDark: isDark,
-            trailing: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: AppTheme.primaryGreen.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'Open',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.primaryGreen,
-                    ),
-                  ),
-                  SizedBox(width: 2),
-                  Icon(Icons.chevron_right_rounded, size: 16, color: AppTheme.primaryGreen),
-                ],
-              ),
-            ),
-            onTap: () {
-              provider.setAppMode(AppMode.customer);
-            },
-          ),
-          const SizedBox(height: 20),
-
-          // WhatsApp Style Google Drive Backup Tile
-          _buildSectionHeader(loc.tr('cloud_backup_title'), isDark),
-          const SizedBox(height: 8),
-          _buildSettingsTile(
-            icon: Icons.add_to_drive_rounded,
-            iconColor: const Color(0xFF4285F4),
-            title: loc.tr('chat_backup'),
-            subtitle: loc.tr('chat_backup_subtitle'),
-            isDark: isDark,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4285F4).withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    'Google Drive',
-                    style: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.bold, color: const Color(0xFF4285F4)),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
-              ],
-            ),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ChatBackupScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 12),
 
           // General Settings Section
           _buildSectionHeader(loc.tr('general_preferences'), isDark),
@@ -345,24 +274,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const SizedBox(height: 20),
 
-          // Business Reports & Statements Section (Under App Settings & Security)
-          _buildSectionHeader(loc.tr('business_reports'), isDark),
-          const SizedBox(height: 8),
-          _buildSettingsTile(
-            icon: Icons.analytics_outlined,
-            iconColor: const Color(0xFF0F766E),
-            title: loc.tr('business_reports'),
-            subtitle: loc.tr('business_reports_subtitle'),
-            isDark: isDark,
-            trailing: const Icon(Icons.chevron_right_rounded, color: Colors.grey),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const ReportsScreen()),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-
           // 30-Day Recycle Bin Section
           _buildSectionHeader(loc.tr('recycle_bin_section'), isDark),
           const SizedBox(height: 8),
@@ -398,6 +309,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
 
+          const SizedBox(height: 20),
+
+          // Account & Phone Authentication Section
+          _buildSectionHeader('Account', isDark),
+          const SizedBox(height: 8),
+          _buildSettingsTile(
+            icon: Icons.phone_android_rounded,
+            iconColor: AppTheme.primaryGreen,
+            title: provider.userIdentifier.isNotEmpty
+                ? 'Logged in as ${provider.userIdentifier}'
+                : 'Phone Authentication',
+            subtitle: 'Firebase Real-time Cloud Sync Active',
+            isDark: isDark,
+            trailing: TextButton(
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.debitRed,
+                visualDensity: VisualDensity.compact,
+              ),
+              onPressed: () async {
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Log Out?'),
+                    content: const Text('Are you sure you want to log out of your account on this device?'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.debitRed, foregroundColor: Colors.white),
+                        onPressed: () => Navigator.pop(ctx, true),
+                        child: const Text('Log Out'),
+                      ),
+                    ],
+                  ),
+                );
+                if (confirm == true) {
+                  await provider.logoutUser();
+                  if (context.mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const SplashScreen()),
+                      (route) => false,
+                    );
+                  }
+                }
+              },
+              child: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            onTap: () {},
+          ),
+
           const SizedBox(height: 32),
           // Version Footer at Bottom
           Center(
@@ -413,7 +373,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${loc.tr('version')} • 100% Secure & Offline-First',
+                  '${loc.tr('version')} • Real-time Cloud Synced',
                   style: GoogleFonts.inter(
                     fontSize: 11,
                     color: Colors.grey,

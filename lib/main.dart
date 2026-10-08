@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'providers/app_state_provider.dart';
 import 'services/storage_service.dart';
 import 'theme/app_theme.dart';
@@ -8,6 +9,13 @@ import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase (Cloud Firestore & Real-time Live Sync)
+  try {
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('Firebase initialization notice: $e');
+  }
 
   // Set system UI overlay style
   SystemChrome.setSystemUIOverlayStyle(

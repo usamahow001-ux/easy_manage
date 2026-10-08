@@ -18,7 +18,7 @@ class BusinessProfile {
     this.address = '',
     this.currencySymbol = 'Rs.',
     this.currencyCode = 'PKR',
-  }) : id = id ?? const Uuid().v4();
+  }) : id = id ?? (PhoneHelper.normalize(phone).isNotEmpty ? PhoneHelper.normalize(phone) : const Uuid().v4());
 
   String get normalizedPhone => PhoneHelper.normalize(phone);
 

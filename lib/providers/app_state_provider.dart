@@ -10,6 +10,8 @@ import '../models/customer_shop_khata.dart';
 import '../services/storage_service.dart';
 import '../services/google_drive_service.dart';
 import '../services/cloud_sync_service.dart';
+import '../services/auth_service.dart';
+import '../services/phone_helper.dart';
 import '../l10n/app_localizations.dart';
 
 enum PartyFilter { all, pendingOnly, clearedOnly }
@@ -21,6 +23,7 @@ class AppStateProvider extends ChangeNotifier {
   final StorageService storageService;
   late final GoogleDriveService googleDriveService;
   late final CloudSyncService cloudSyncService;
+  late final AuthService authService;
 
   List<Party> _parties = [];
   List<KhataTransaction> _transactions = [];
@@ -36,7 +39,7 @@ class AppStateProvider extends ChangeNotifier {
   bool _isLoadingCustomerKhatas = false;
 
   // Auth & Cloud state
-  bool _isLoggedIn = true;
+  bool _isLoggedIn = false;
   String _userIdentifier = '';
   DateTime _lastSyncTime = DateTime.now();
 
@@ -57,8 +60,16 @@ class AppStateProvider extends ChangeNotifier {
   AppStateProvider(this.storageService) {
     googleDriveService = GoogleDriveService(storageService.prefs);
     cloudSyncService = CloudSyncService(storageService.prefs);
-    _customerPhoneNumber = cloudSyncService.getSavedCustomerPhone() ?? '';
+    authService = AuthService(storageService.prefs);
+    _isLoggedIn = authService.isLoggedIn;
+    _userIdentifier = authService.currentUserPhone;
+    _customerPhoneNumber = _userIdentifier.isNotEmpty
+        ? _userIdentifier
+        : (cloudSyncService.getSavedCustomerPhone() ?? '');
     _loadAllData();
+    if (_userIdentifier.isNotEmpty) {
+      refreshCustomerKhatas();
+    }
   }
 
   // Getters
@@ -116,18 +127,55 @@ class AppStateProvider extends ChangeNotifier {
   }
 
   void _loadAllData() {
-    _parties = storageService.loadParties();
-    _transactions = storageService.loadTransactions();
-    _cashEntries = storageService.loadCashEntries();
-    _deletedItems = storageService.loadDeletedItems();
-    _businessProfile = storageService.loadBusinessProfile();
-
-    final rawCalcHistory = storageService.loadCalculatorHistory();
-    _calculatorHistory = rawCalcHistory.map((e) => CalculationRecord.fromJson(e)).toList();
-
     _isLoggedIn = storageService.loadAuthLoggedIn();
     _userIdentifier = storageService.loadAuthIdentifier();
     _lastSyncTime = DateTime.tryParse(storageService.loadLastSyncTime()) ?? DateTime.now();
+
+    if (_isLoggedIn && _userIdentifier.isNotEmpty) {
+      final vault = storageService.getCloudVault(_userIdentifier);
+      if (vault != null) {
+        try {
+          if (vault['business'] != null) {
+            _businessProfile = BusinessProfile.fromJson(vault['business'] as Map<String, dynamic>);
+          } else {
+            _businessProfile = storageService.loadBusinessProfile();
+          }
+          if (vault['parties'] != null) {
+            final list = vault['parties'] as List;
+            _parties = list.map((e) => Party.fromJson(e as Map<String, dynamic>)).toList();
+          } else {
+            _parties = storageService.loadParties();
+          }
+          if (vault['transactions'] != null) {
+            final list = vault['transactions'] as List;
+            _transactions = list.map((e) => KhataTransaction.fromJson(e as Map<String, dynamic>)).toList();
+          } else {
+            _transactions = storageService.loadTransactions();
+          }
+          if (vault['cashEntries'] != null) {
+            final list = vault['cashEntries'] as List;
+            _cashEntries = list.map((e) => CashEntry.fromJson(e as Map<String, dynamic>)).toList();
+          } else {
+            _cashEntries = storageService.loadCashEntries();
+          }
+          if (vault['deletedItems'] != null) {
+            final list = vault['deletedItems'] as List;
+            _deletedItems = list.map((e) => DeletedItem.fromJson(e as Map<String, dynamic>)).toList();
+          } else {
+            _deletedItems = storageService.loadDeletedItems();
+          }
+        } catch (_) {
+          _loadDefaultLocalData();
+        }
+      } else {
+        _loadDefaultLocalData();
+      }
+    } else {
+      _loadDefaultLocalData();
+    }
+
+    final rawCalcHistory = storageService.loadCalculatorHistory();
+    _calculatorHistory = rawCalcHistory.map((e) => CalculationRecord.fromJson(e)).toList();
 
     _isAppLockEnabled = storageService.loadAppLockEnabled();
     _appLockPin = storageService.loadAppLockPin();
@@ -145,6 +193,14 @@ class AppStateProvider extends ChangeNotifier {
     _isDarkMode = storageService.loadDarkMode();
     _isBalanceHidden = storageService.loadHideBalance();
     notifyListeners();
+  }
+
+  void _loadDefaultLocalData() {
+    _parties = storageService.loadParties();
+    _transactions = storageService.loadTransactions();
+    _cashEntries = storageService.loadCashEntries();
+    _deletedItems = storageService.loadDeletedItems();
+    _businessProfile = storageService.loadBusinessProfile();
   }
 
   void setSearchQuery(String q) {
@@ -337,10 +393,6 @@ class AppStateProvider extends ChangeNotifier {
     _lastSyncTime = DateTime.now();
     await storageService.updateLastSyncTime();
 
-    if (googleDriveService.isAutoBackupEnabled) {
-      await backupToGoogleDrive();
-    }
-
     if (_appMode == AppMode.customer && _customerPhoneNumber.isNotEmpty) {
       await refreshCustomerKhatas();
     }
@@ -368,11 +420,13 @@ class AppStateProvider extends ChangeNotifier {
     _isLoadingCustomerKhatas = true;
     notifyListeners();
 
-    await cloudSyncService.syncShopkeeperData(
-      business: _businessProfile,
-      parties: _parties,
-      transactions: _transactions,
-    );
+    if (_parties.isNotEmpty || (_businessProfile.businessName.isNotEmpty && _businessProfile.businessName != 'My Business')) {
+      await cloudSyncService.syncShopkeeperData(
+        business: _businessProfile,
+        parties: _parties,
+        transactions: _transactions,
+      );
+    }
 
     _customerKhatas = await cloudSyncService.fetchCustomerKhatas(_customerPhoneNumber);
     _isLoadingCustomerKhatas = false;
@@ -384,6 +438,126 @@ class AppStateProvider extends ChangeNotifier {
       business: _businessProfile,
       party: party,
     );
+  }
+
+  // Helper to save current state to user vault
+  Future<void> _saveCurrentToVault() async {
+    if (_userIdentifier.isEmpty) return;
+    final payload = {
+      'syncedAt': DateTime.now().toIso8601String(),
+      'identifier': _userIdentifier,
+      'business': _businessProfile.toJson(),
+      'parties': _parties.map((p) => p.toJson()).toList(),
+      'transactions': _transactions.map((t) => t.toJson()).toList(),
+      'cashEntries': _cashEntries.map((c) => c.toJson()).toList(),
+      'deletedItems': _deletedItems.map((d) => d.toJson()).toList(),
+    };
+    await storageService.saveCloudVault(_userIdentifier, payload);
+  }
+
+  void _resetToFreshAccount(String phone) {
+    _parties = [];
+    _transactions = [];
+    _cashEntries = [];
+    _deletedItems = [];
+    _businessProfile = BusinessProfile(phone: phone);
+  }
+
+  // Phone Auth Success handler - cleanly isolates each user's data
+  Future<void> onPhoneLoginSuccess(String phone) async {
+    final cleanPhone = PhoneHelper.normalize(phone);
+
+    // 1. If switching user or new login, save previous user's vault if valid
+    if (_userIdentifier.isNotEmpty && _userIdentifier != cleanPhone) {
+      await _saveCurrentToVault();
+    }
+
+    // 2. Set new active user session
+    _userIdentifier = cleanPhone;
+    _customerPhoneNumber = cleanPhone;
+    _isLoggedIn = true;
+    _isAppUnlocked = true;
+    await storageService.setAuthStatus(isLoggedIn: true, identifier: cleanPhone);
+
+    // 3. Try to load vault specifically for this phone number
+    final vault = storageService.getCloudVault(cleanPhone);
+    if (vault != null) {
+      try {
+        if (vault['business'] != null) {
+          _businessProfile = BusinessProfile.fromJson(vault['business'] as Map<String, dynamic>);
+        } else {
+          _businessProfile = BusinessProfile(phone: cleanPhone);
+        }
+        if (vault['parties'] != null) {
+          final list = vault['parties'] as List;
+          _parties = list.map((e) => Party.fromJson(e as Map<String, dynamic>)).toList();
+        } else {
+          _parties = [];
+        }
+        if (vault['transactions'] != null) {
+          final list = vault['transactions'] as List;
+          _transactions = list.map((e) => KhataTransaction.fromJson(e as Map<String, dynamic>)).toList();
+        } else {
+          _transactions = [];
+        }
+        if (vault['cashEntries'] != null) {
+          final list = vault['cashEntries'] as List;
+          _cashEntries = list.map((e) => CashEntry.fromJson(e as Map<String, dynamic>)).toList();
+        } else {
+          _cashEntries = [];
+        }
+        if (vault['deletedItems'] != null) {
+          final list = vault['deletedItems'] as List;
+          _deletedItems = list.map((e) => DeletedItem.fromJson(e as Map<String, dynamic>)).toList();
+        } else {
+          _deletedItems = [];
+        }
+      } catch (_) {
+        _resetToFreshAccount(cleanPhone);
+      }
+    } else {
+      _resetToFreshAccount(cleanPhone);
+    }
+
+    // 4. Persist active state locally
+    await storageService.saveParties(_parties);
+    await storageService.saveTransactions(_transactions);
+    await storageService.saveCashEntries(_cashEntries);
+    await storageService.saveDeletedItems(_deletedItems);
+    await storageService.saveBusinessProfile(_businessProfile);
+
+    // 5. Query all other shops that have added this phone number as customer
+    _customerKhatas = await cloudSyncService.fetchCustomerKhatas(cleanPhone);
+
+    // 6. Sync own shopkeeper data if this user has any shop parties
+    if (_parties.isNotEmpty || (_businessProfile.businessName.isNotEmpty && _businessProfile.businessName != 'My Business')) {
+      await syncToCloud();
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> logoutUser() async {
+    if (_userIdentifier.isNotEmpty) {
+      await _saveCurrentToVault();
+    }
+    await authService.signOut();
+    _isLoggedIn = false;
+    _userIdentifier = '';
+    _customerPhoneNumber = '';
+    _customerKhatas.clear();
+    _parties.clear();
+    _transactions.clear();
+    _cashEntries.clear();
+    _deletedItems.clear();
+    _businessProfile = BusinessProfile();
+    await storageService.saveParties(_parties);
+    await storageService.saveTransactions(_transactions);
+    await storageService.saveCashEntries(_cashEntries);
+    await storageService.saveDeletedItems(_deletedItems);
+    await storageService.saveBusinessProfile(_businessProfile);
+    await storageService.setAuthStatus(isLoggedIn: false, identifier: '');
+    notifyListeners();
   }
 
   // Login & Restore Flow
