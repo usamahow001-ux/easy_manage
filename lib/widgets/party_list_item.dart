@@ -55,7 +55,6 @@ class PartyListItem extends StatelessWidget {
     final currency = provider.businessProfile.currencySymbol;
     final loc = provider.loc;
     final isDark = provider.isDarkMode;
-    final isHidden = provider.isBalanceHidden;
 
     final colorIndex = party.avatarColorIndex % avatarColors.length;
     final avatarColor = avatarColors[colorIndex];
@@ -230,7 +229,7 @@ class PartyListItem extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      isHidden ? '••••••' : '$currency ${balance.abs().toStringAsFixed(0)}',
+                      '$currency ${balance.abs().toStringAsFixed(0)}',
                       style: GoogleFonts.outfit(
                         fontSize: 15.5,
                         fontWeight: FontWeight.bold,

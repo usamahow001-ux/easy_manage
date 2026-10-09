@@ -497,12 +497,16 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final list = provider.getFilteredParties(type);
 
     if (list.isEmpty) {
-      return Center(
+      return RefreshIndicator(
+        color: AppTheme.primaryGreen,
+        onRefresh: () => provider.syncNow(),
         child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              const SizedBox(height: 32),
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -535,45 +539,95 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 ),
               ),
               const SizedBox(height: 20),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
-                label: Text(
-                  type == PartyType.customer ? loc.tr('add_customer') : loc.tr('add_supplier'),
-                ),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primaryGreen,
-                  side: const BorderSide(color: AppTheme.primaryGreen, width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                ),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => AddPartyScreen(initialType: type)),
-                  );
-                },
+              Wrap(
+                spacing: 12,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
+                children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+                    label: Text(
+                      type == PartyType.customer ? loc.tr('add_customer') : loc.tr('add_supplier'),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppTheme.primaryGreen,
+                      side: const BorderSide(color: AppTheme.primaryGreen, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => AddPartyScreen(initialType: type)),
+                      );
+                    },
+                  ),
+                  if (provider.isLoggedIn)
+                    ElevatedButton.icon(
+                      icon: provider.isSyncing
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Icon(Icons.cloud_download_rounded, size: 18),
+                      label: Text(provider.isSyncing ? 'Syncing...' : 'Sync from Cloud'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppTheme.primaryGreen,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                      ),
+                      onPressed: provider.isSyncing
+                          ? null
+                          : () async {
+                              final scaffoldMessenger = ScaffoldMessenger.of(context);
+                              scaffoldMessenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Downloading entries from cloud...'),
+                                  duration: Duration(milliseconds: 900),
+                                ),
+                              );
+                              final ok = await provider.syncNow();
+                              if (context.mounted) {
+                                scaffoldMessenger.showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: ok ? AppTheme.primaryGreen : AppTheme.debitRed,
+                                    content: Text(ok ? 'Sync complete! All entries restored.' : 'Sync failed. Please check internet connection.'),
+                                  ),
+                                );
+                              }
+                            },
+                    ),
+                ],
               ),
+              const SizedBox(height: 40),
             ],
           ),
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(top: 4, bottom: 84),
-      itemCount: list.length,
-      itemBuilder: (context, index) {
-        final party = list[index];
-        return PartyListItem(
-          party: party,
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => PartyDetailScreen(partyId: party.id),
-              ),
-            );
-          },
-        );
-      },
+    return RefreshIndicator(
+      color: AppTheme.primaryGreen,
+      onRefresh: () => provider.syncNow(),
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(top: 4, bottom: 84),
+        itemCount: list.length,
+        itemBuilder: (context, index) {
+          final party = list[index];
+          return PartyListItem(
+            party: party,
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => PartyDetailScreen(partyId: party.id),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 

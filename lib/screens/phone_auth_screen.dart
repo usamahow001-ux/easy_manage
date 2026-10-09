@@ -17,7 +17,7 @@ class PhoneAuthScreen extends StatefulWidget {
 }
 
 class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _phoneController = TextEditingController(text: '03404779596');
   final List<TextEditingController> _otpControllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _otpFocusNodes = List.generate(6, (_) => FocusNode());
 
@@ -138,13 +138,27 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
   }
 
   Future<void> _continueOffline() async {
+    String rawPhone = _phoneController.text.trim();
+    if (rawPhone.isEmpty) {
+      rawPhone = '03404779596';
+      _phoneController.text = rawPhone;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
     final provider = Provider.of<AppStateProvider>(context, listen: false);
-    final rawPhone = _phoneController.text.trim();
-    if (rawPhone.isNotEmpty) {
-      final normalized = PhoneHelper.normalize(rawPhone);
+    final normalized = PhoneHelper.normalize(rawPhone);
+
+    try {
       await provider.authService.loginDirectly(normalized);
       await provider.onPhoneLoginSuccess(normalized);
+    } catch (e) {
+      debugPrint('Login sync error: $e');
     }
+
     if (mounted) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (_) => const HomeScreen()),

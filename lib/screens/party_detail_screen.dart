@@ -47,7 +47,6 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
     final provider = context.watch<AppStateProvider>();
     final loc = provider.loc;
     final isDark = provider.isDarkMode;
-    final isHidden = provider.isBalanceHidden;
     final currency = provider.businessProfile.currencySymbol;
 
     final party = provider.parties.firstWhere(
@@ -103,13 +102,9 @@ class _PartyDetailScreenState extends State<PartyDetailScreen> {
 
     String statusText = 'Account Settled (0)';
     if (isReceivable) {
-      statusText = isHidden
-          ? '${loc.tr('you_will_get')} : ••••••'
-          : '${loc.tr('you_will_get')} : $currency ${balance.abs().toStringAsFixed(0)}';
+      statusText = '${loc.tr('you_will_get')} : $currency ${balance.abs().toStringAsFixed(0)}';
     } else if (isPayable) {
-      statusText = isHidden
-          ? '${loc.tr('you_will_give')} : ••••••'
-          : '${loc.tr('you_will_give')} : $currency ${balance.abs().toStringAsFixed(0)}';
+      statusText = '${loc.tr('you_will_give')} : $currency ${balance.abs().toStringAsFixed(0)}';
     }
 
     return Scaffold(

@@ -5,6 +5,8 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/party.dart';
 import '../models/transaction.dart';
+import '../models/cash_entry.dart';
+import '../models/deleted_item.dart';
 import '../models/business_profile.dart';
 import '../models/customer_shop_khata.dart';
 import 'phone_helper.dart';
@@ -32,7 +34,12 @@ class CloudSyncService {
     required BusinessProfile business,
     required List<Party> parties,
     required List<KhataTransaction> transactions,
+    List<CashEntry>? cashEntries,
+    List<DeletedItem>? deletedItems,
+    String? userPhone,
   }) async {
+    final cleanPhone = PhoneHelper.normalize(userPhone ?? business.phone);
+
     // 1. Always maintain local cache for instant offline responsiveness
     try {
       final cloudIndexRaw = prefs.getString(_kCloudIndexKey);
@@ -47,10 +54,16 @@ class CloudSyncService {
         'business': business.toJson(),
         'parties': parties.map((p) => p.toJson()).toList(),
         'transactions': transactions.map((t) => t.toJson()).toList(),
+        'cashEntries': (cashEntries ?? []).map((c) => c.toJson()).toList(),
+        'deletedItems': (deletedItems ?? []).map((d) => d.toJson()).toList(),
+        'userPhone': cleanPhone,
         'lastSynced': DateTime.now().toIso8601String(),
       };
 
       index[business.id] = shopData;
+      if (cleanPhone.isNotEmpty) {
+        index[cleanPhone] = shopData;
+      }
       await prefs.setString(_kCloudIndexKey, jsonEncode(index));
     } catch (_) {}
 
@@ -58,10 +71,27 @@ class CloudSyncService {
     try {
       if (Firebase.apps.isNotEmpty) {
         final firestore = FirebaseFirestore.instance;
+
+        // A. Primary Account Vault: Dedicated User Document by phone number
+        if (cleanPhone.isNotEmpty) {
+          final vaultDoc = firestore.collection('user_vaults').doc(cleanPhone);
+          await vaultDoc.set({
+            'userPhone': cleanPhone,
+            'business': business.toJson(),
+            'parties': parties.map((p) => p.toJson()).toList(),
+            'transactions': transactions.map((t) => t.toJson()).toList(),
+            'cashEntries': (cashEntries ?? []).map((c) => c.toJson()).toList(),
+            'deletedItems': (deletedItems ?? []).map((d) => d.toJson()).toList(),
+            'lastSynced': FieldValue.serverTimestamp(),
+            'updatedAt': DateTime.now().toIso8601String(),
+          }, SetOptions(merge: true));
+        }
+
         final shopDoc = firestore.collection('businesses').doc(business.id);
 
         await shopDoc.set({
           'business': business.toJson(),
+          'ownerPhone': cleanPhone,
           'lastSynced': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
 
@@ -274,5 +304,117 @@ class CloudSyncService {
 
   String? getSavedCustomerPhone() {
     return prefs.getString(_kCustomerPhoneKey);
+  }
+
+  /// Fetches complete user account vault from Firebase Cloud Firestore
+  /// across any device logged into this phone number
+  Future<Map<String, dynamic>?> fetchUserVault(String userPhone) async {
+    final cleanPhone = PhoneHelper.normalize(userPhone);
+    if (cleanPhone.isEmpty) return null;
+
+    try {
+      if (Firebase.apps.isNotEmpty) {
+        final firestore = FirebaseFirestore.instance;
+
+        // 1. Primary: Direct fetch from user_vaults by phone
+        final vaultDoc = await firestore.collection('user_vaults').doc(cleanPhone).get();
+        if (vaultDoc.exists && vaultDoc.data() != null) {
+          final data = vaultDoc.data()!;
+          if (data['business'] != null || data['parties'] != null) {
+            return data;
+          }
+        }
+
+        // 2. Fallback: Search businesses collection across multiple phone representations
+        final List<String> phoneVariants = [
+          cleanPhone,
+          userPhone.trim(),
+          if (cleanPhone.startsWith('+92')) '0${cleanPhone.substring(3)}',
+          if (cleanPhone.startsWith('+')) cleanPhone.substring(1),
+        ];
+
+        for (final variant in phoneVariants) {
+          if (variant.isEmpty) continue;
+
+          // Check by ownerPhone
+          final ownerSnap = await firestore
+              .collection('businesses')
+              .where('ownerPhone', isEqualTo: variant)
+              .limit(1)
+              .get();
+          if (ownerSnap.docs.isNotEmpty) {
+            return await _reconstructVaultFromBusinessDoc(ownerSnap.docs.first, cleanPhone);
+          }
+
+          // Check by business.phone
+          final phoneSnap = await firestore
+              .collection('businesses')
+              .where('business.phone', isEqualTo: variant)
+              .limit(1)
+              .get();
+          if (phoneSnap.docs.isNotEmpty) {
+            return await _reconstructVaultFromBusinessDoc(phoneSnap.docs.first, cleanPhone);
+          }
+
+          // Check doc ID directly
+          final directDoc = await firestore.collection('businesses').doc(variant).get();
+          if (directDoc.exists && directDoc.data() != null) {
+            return await _reconstructVaultFromBusinessDoc(directDoc, cleanPhone);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error fetching user vault from Firestore: $e');
+    }
+
+    // 3. Fallback to local device cache
+    final cleanKey = cleanPhone.replaceAll(' ', '').toLowerCase();
+    final localVaultRaw = prefs.getString('easymanage_cloud_vault_v1_$cleanKey');
+    if (localVaultRaw != null && localVaultRaw.isNotEmpty) {
+      try {
+        return jsonDecode(localVaultRaw) as Map<String, dynamic>;
+      } catch (_) {}
+    }
+
+    return null;
+  }
+
+  Future<Map<String, dynamic>> _reconstructVaultFromBusinessDoc(
+    DocumentSnapshot bDoc,
+    String cleanPhone,
+  ) async {
+    final bData = bDoc.data() as Map<String, dynamic>;
+    final bizMap = bData['business'] as Map<String, dynamic>? ?? {};
+
+    List<dynamic> partiesList = [];
+    List<dynamic> txsList = [];
+
+    try {
+      final partiesSnap = await bDoc.reference.collection('parties').get();
+      partiesList = partiesSnap.docs.map((d) => d.data()).toList();
+    } catch (_) {}
+
+    try {
+      final txsSnap = await bDoc.reference.collection('transactions').get();
+      txsList = txsSnap.docs.map((d) => d.data()).toList();
+    } catch (_) {}
+
+    final reconstructed = {
+      'userPhone': cleanPhone,
+      'business': bizMap,
+      'parties': partiesList,
+      'transactions': txsList,
+      'cashEntries': [],
+      'deletedItems': [],
+      'syncedAt': DateTime.now().toIso8601String(),
+    };
+
+    // Cache to user_vaults for fast next load
+    try {
+      final firestore = FirebaseFirestore.instance;
+      await firestore.collection('user_vaults').doc(cleanPhone).set(reconstructed, SetOptions(merge: true));
+    } catch (_) {}
+
+    return reconstructed;
   }
 }

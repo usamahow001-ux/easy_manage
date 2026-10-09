@@ -8,7 +8,6 @@ import '../models/deleted_item.dart';
 import '../models/calculation_record.dart';
 import '../models/customer_shop_khata.dart';
 import '../services/storage_service.dart';
-import '../services/google_drive_service.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/auth_service.dart';
 import '../services/phone_helper.dart';
@@ -21,7 +20,6 @@ enum AppMode { shopkeeper, customer }
 
 class AppStateProvider extends ChangeNotifier {
   final StorageService storageService;
-  late final GoogleDriveService googleDriveService;
   late final CloudSyncService cloudSyncService;
   late final AuthService authService;
 
@@ -42,6 +40,8 @@ class AppStateProvider extends ChangeNotifier {
   bool _isLoggedIn = false;
   String _userIdentifier = '';
   DateTime _lastSyncTime = DateTime.now();
+  bool _isSyncing = false;
+  String? _syncStatusMessage;
 
   // App Lock state
   bool _isAppLockEnabled = false;
@@ -58,7 +58,6 @@ class AppStateProvider extends ChangeNotifier {
   TimePeriod _cashPeriod = TimePeriod.all;
 
   AppStateProvider(this.storageService) {
-    googleDriveService = GoogleDriveService(storageService.prefs);
     cloudSyncService = CloudSyncService(storageService.prefs);
     authService = AuthService(storageService.prefs);
     _isLoggedIn = authService.isLoggedIn;
@@ -69,10 +68,13 @@ class AppStateProvider extends ChangeNotifier {
     _loadAllData();
     if (_userIdentifier.isNotEmpty) {
       refreshCustomerKhatas();
+      autoSyncFromCloud();
     }
   }
 
   // Getters
+  bool get isSyncing => _isSyncing;
+  String? get syncStatusMessage => _syncStatusMessage;
   AppMode get appMode => _appMode;
   String get customerPhoneNumber => _customerPhoneNumber;
   List<CustomerShopKhata> get customerKhatas => _customerKhatas;
@@ -307,74 +309,15 @@ class AppStateProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Google Drive Backup & Sync
-  Future<GoogleDriveBackupInfo> backupToGoogleDrive([String? email]) async {
-    final targetEmail = email ?? googleDriveService.connectedGoogleAccount;
-    final info = await googleDriveService.backupToGoogleDrive(
-      accountEmail: targetEmail,
-      business: _businessProfile,
-      parties: _parties,
-      transactions: _transactions,
-      cashEntries: _cashEntries,
-      deletedItems: _deletedItems,
-      calculatorHistory: _calculatorHistory.map((e) => e.toJson()).toList(),
-      totalReceivable: totalReceivable,
-      totalPayable: totalPayable,
-    );
-    _lastSyncTime = DateTime.now();
-    await storageService.updateLastSyncTime();
-    notifyListeners();
-    return info;
-  }
-
-  Future<bool> restoreFromGoogleDrive([String? email]) async {
-    final targetEmail = email ?? googleDriveService.connectedGoogleAccount;
-    final payload = await googleDriveService.fetchDriveBackupPayload(targetEmail);
-    if (payload == null) return false;
-
-    try {
-      if (payload['business'] != null) {
-        _businessProfile = BusinessProfile.fromJson(payload['business'] as Map<String, dynamic>);
-      }
-      if (payload['parties'] != null) {
-        final list = payload['parties'] as List;
-        _parties = list.map((e) => Party.fromJson(e as Map<String, dynamic>)).toList();
-      }
-      if (payload['transactions'] != null) {
-        final list = payload['transactions'] as List;
-        _transactions = list.map((e) => KhataTransaction.fromJson(e as Map<String, dynamic>)).toList();
-      }
-      if (payload['cashEntries'] != null) {
-        final list = payload['cashEntries'] as List;
-        _cashEntries = list.map((e) => CashEntry.fromJson(e as Map<String, dynamic>)).toList();
-      }
-      if (payload['deletedItems'] != null) {
-        final list = payload['deletedItems'] as List;
-        _deletedItems = list.map((e) => DeletedItem.fromJson(e as Map<String, dynamic>)).toList();
-      }
-      if (payload['calculatorHistory'] != null) {
-        final list = payload['calculatorHistory'] as List;
-        _calculatorHistory = list.map((e) => CalculationRecord.fromJson(e as Map<String, dynamic>)).toList();
-        await storageService.saveCalculatorHistory(list.map((e) => Map<String, dynamic>.from(e as Map)).toList());
-      }
-      await storageService.saveParties(_parties);
-      await storageService.saveTransactions(_transactions);
-      await storageService.saveCashEntries(_cashEntries);
-      await storageService.saveDeletedItems(_deletedItems);
-      await storageService.saveBusinessProfile(_businessProfile);
-      notifyListeners();
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
   // Cloud Sync & Verification
   Future<void> syncToCloud() async {
     await cloudSyncService.syncShopkeeperData(
       business: _businessProfile,
       parties: _parties,
       transactions: _transactions,
+      cashEntries: _cashEntries,
+      deletedItems: _deletedItems,
+      userPhone: _userIdentifier,
     );
 
     if (_userIdentifier.isNotEmpty) {
@@ -463,7 +406,188 @@ class AppStateProvider extends ChangeNotifier {
     _businessProfile = BusinessProfile(phone: phone);
   }
 
-  // Phone Auth Success handler - cleanly isolates each user's data
+  /// Cleanly merges account data from a cloud or local vault into state without duplicates
+  void _mergeVaultData(Map<String, dynamic> vault) {
+    try {
+      // 1. Business Profile
+      if (vault['business'] != null) {
+        final cloudBiz = BusinessProfile.fromJson(vault['business'] as Map<String, dynamic>);
+        if (_businessProfile.businessName == 'My Business' && cloudBiz.businessName.isNotEmpty) {
+          _businessProfile = cloudBiz;
+        } else if (cloudBiz.businessName.isNotEmpty && cloudBiz.businessName != 'My Business') {
+          _businessProfile = cloudBiz;
+        }
+      }
+
+      if (_businessProfile.phone.isEmpty && _userIdentifier.isNotEmpty) {
+        _businessProfile = _businessProfile.copyWith(phone: _userIdentifier);
+      }
+
+      // 2. Parties
+      if (vault['parties'] != null) {
+        final cloudParties = (vault['parties'] as List)
+            .map((e) => Party.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+        final Map<String, Party> partyMap = {for (final p in _parties) p.id: p};
+        for (final cp in cloudParties) {
+          if (!partyMap.containsKey(cp.id)) {
+            partyMap[cp.id] = cp;
+          } else {
+            final localP = partyMap[cp.id]!;
+            if (localP.name.isEmpty && cp.name.isNotEmpty) {
+              partyMap[cp.id] = cp;
+            }
+          }
+        }
+        _parties = partyMap.values.toList();
+      }
+
+      // 3. Transactions
+      if (vault['transactions'] != null) {
+        final cloudTxs = (vault['transactions'] as List)
+            .map((e) => KhataTransaction.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+        final Map<String, KhataTransaction> txMap = {for (final t in _transactions) t.id: t};
+        for (final ct in cloudTxs) {
+          if (!txMap.containsKey(ct.id)) {
+            txMap[ct.id] = ct;
+          }
+        }
+        _transactions = txMap.values.toList();
+      }
+
+      // 4. Cash Entries
+      if (vault['cashEntries'] != null) {
+        final cloudCash = (vault['cashEntries'] as List)
+            .map((e) => CashEntry.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+        final Map<String, CashEntry> cashMap = {for (final c in _cashEntries) c.id: c};
+        for (final cc in cloudCash) {
+          if (!cashMap.containsKey(cc.id)) {
+            cashMap[cc.id] = cc;
+          }
+        }
+        _cashEntries = cashMap.values.toList();
+      }
+
+      // 5. Deleted Items
+      if (vault['deletedItems'] != null) {
+        final cloudDel = (vault['deletedItems'] as List)
+            .map((e) => DeletedItem.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList();
+        final Map<String, DeletedItem> delMap = {for (final d in _deletedItems) d.id: d};
+        for (final cd in cloudDel) {
+          if (!delMap.containsKey(cd.id)) {
+            delMap[cd.id] = cd;
+          }
+        }
+        _deletedItems = delMap.values.toList();
+      }
+    } catch (e) {
+      debugPrint('Error merging vault data: $e');
+    }
+  }
+
+  /// Persists active in-memory state to device local storage for instant offline access
+  Future<void> _saveCurrentStateLocally() async {
+    await storageService.saveParties(_parties);
+    await storageService.saveTransactions(_transactions);
+    await storageService.saveCashEntries(_cashEntries);
+    await storageService.saveDeletedItems(_deletedItems);
+    await storageService.saveBusinessProfile(_businessProfile);
+
+    if (_userIdentifier.isNotEmpty) {
+      final payload = {
+        'syncedAt': DateTime.now().toIso8601String(),
+        'identifier': _userIdentifier,
+        'business': _businessProfile.toJson(),
+        'parties': _parties.map((p) => p.toJson()).toList(),
+        'transactions': _transactions.map((t) => t.toJson()).toList(),
+        'cashEntries': _cashEntries.map((c) => c.toJson()).toList(),
+        'deletedItems': _deletedItems.map((d) => d.toJson()).toList(),
+      };
+      await storageService.saveCloudVault(_userIdentifier, payload);
+    }
+  }
+
+  /// Automatically syncs with Firestore in the background on app open
+  Future<void> autoSyncFromCloud() async {
+    if (_userIdentifier.isEmpty) return;
+    try {
+      _isSyncing = true;
+      notifyListeners();
+
+      final cloudVault = await cloudSyncService.fetchUserVault(_userIdentifier);
+      if (cloudVault != null) {
+        _mergeVaultData(cloudVault);
+        await _saveCurrentStateLocally();
+      }
+
+      // Push any local offline entries up to Firestore
+      await cloudSyncService.syncShopkeeperData(
+        business: _businessProfile,
+        parties: _parties,
+        transactions: _transactions,
+        cashEntries: _cashEntries,
+        deletedItems: _deletedItems,
+        userPhone: _userIdentifier,
+      );
+
+      _lastSyncTime = DateTime.now();
+      await storageService.updateLastSyncTime();
+    } catch (e) {
+      debugPrint('Auto sync error: $e');
+    } finally {
+      _isSyncing = false;
+      notifyListeners();
+    }
+  }
+
+  /// User-initiated or pull-to-refresh sync across all devices and customers
+  Future<bool> syncNow() async {
+    if (_userIdentifier.isEmpty) return false;
+    try {
+      _isSyncing = true;
+      _syncStatusMessage = 'Syncing with cloud...';
+      notifyListeners();
+
+      // 1. Fetch remote cloud vault from Firestore
+      final cloudVault = await cloudSyncService.fetchUserVault(_userIdentifier);
+      if (cloudVault != null) {
+        _mergeVaultData(cloudVault);
+      }
+
+      // 2. Push unified data up to Firestore (user_vaults + businesses + customers)
+      final success = await cloudSyncService.syncShopkeeperData(
+        business: _businessProfile,
+        parties: _parties,
+        transactions: _transactions,
+        cashEntries: _cashEntries,
+        deletedItems: _deletedItems,
+        userPhone: _userIdentifier,
+      );
+
+      // 3. Save merged data locally for offline use
+      await _saveCurrentStateLocally();
+
+      // 4. Refresh customer khatas (if this user is added by other shops)
+      _customerKhatas = await cloudSyncService.fetchCustomerKhatas(_userIdentifier);
+
+      _lastSyncTime = DateTime.now();
+      await storageService.updateLastSyncTime();
+
+      return success;
+    } catch (e) {
+      debugPrint('syncNow error: $e');
+      return false;
+    } finally {
+      _isSyncing = false;
+      _syncStatusMessage = null;
+      notifyListeners();
+    }
+  }
+
+  // Phone Auth Success handler - cleanly restores and syncs user's data across devices
   Future<void> onPhoneLoginSuccess(String phone) async {
     final cleanPhone = PhoneHelper.normalize(phone);
 
@@ -477,63 +601,64 @@ class AppStateProvider extends ChangeNotifier {
     _customerPhoneNumber = cleanPhone;
     _isLoggedIn = true;
     _isAppUnlocked = true;
+    _isSyncing = true;
+    _syncStatusMessage = 'Downloading your Khata & entries from cloud...';
+    notifyListeners();
+
     await storageService.setAuthStatus(isLoggedIn: true, identifier: cleanPhone);
 
-    // 3. Try to load vault specifically for this phone number
-    final vault = storageService.getCloudVault(cleanPhone);
-    if (vault != null) {
-      try {
-        if (vault['business'] != null) {
-          _businessProfile = BusinessProfile.fromJson(vault['business'] as Map<String, dynamic>);
-        } else {
-          _businessProfile = BusinessProfile(phone: cleanPhone);
-        }
-        if (vault['parties'] != null) {
-          final list = vault['parties'] as List;
-          _parties = list.map((e) => Party.fromJson(e as Map<String, dynamic>)).toList();
-        } else {
-          _parties = [];
-        }
-        if (vault['transactions'] != null) {
-          final list = vault['transactions'] as List;
-          _transactions = list.map((e) => KhataTransaction.fromJson(e as Map<String, dynamic>)).toList();
-        } else {
-          _transactions = [];
-        }
-        if (vault['cashEntries'] != null) {
-          final list = vault['cashEntries'] as List;
-          _cashEntries = list.map((e) => CashEntry.fromJson(e as Map<String, dynamic>)).toList();
-        } else {
-          _cashEntries = [];
-        }
-        if (vault['deletedItems'] != null) {
-          final list = vault['deletedItems'] as List;
-          _deletedItems = list.map((e) => DeletedItem.fromJson(e as Map<String, dynamic>)).toList();
-        } else {
-          _deletedItems = [];
-        }
-      } catch (_) {
-        _resetToFreshAccount(cleanPhone);
-      }
-    } else {
-      _resetToFreshAccount(cleanPhone);
+    // 3. FETCH COMPLETE USER DATA FROM FIREBASE FIRESTORE ACROSS DEVICES
+    Map<String, dynamic>? cloudVault;
+    try {
+      cloudVault = await cloudSyncService.fetchUserVault(cleanPhone);
+    } catch (e) {
+      debugPrint('Error fetching cloud vault on login: $e');
     }
 
-    // 4. Persist active state locally
-    await storageService.saveParties(_parties);
-    await storageService.saveTransactions(_transactions);
-    await storageService.saveCashEntries(_cashEntries);
-    await storageService.saveDeletedItems(_deletedItems);
-    await storageService.saveBusinessProfile(_businessProfile);
+    final localVault = storageService.getCloudVault(cleanPhone);
+
+    // Reset current state to prepare for restored data
+    _resetToFreshAccount(cleanPhone);
+
+    if (cloudVault != null) {
+      _mergeVaultData(cloudVault);
+      if (localVault != null) {
+        _mergeVaultData(localVault);
+      }
+    } else if (localVault != null) {
+      _mergeVaultData(localVault);
+    }
+
+    // Guarantee business profile phone is set
+    if (_businessProfile.phone.isEmpty) {
+      _businessProfile = _businessProfile.copyWith(phone: cleanPhone);
+    }
+
+    // 4. Persist active state locally so it is available offline immediately
+    await _saveCurrentStateLocally();
 
     // 5. Query all other shops that have added this phone number as customer
-    _customerKhatas = await cloudSyncService.fetchCustomerKhatas(cleanPhone);
+    try {
+      _customerKhatas = await cloudSyncService.fetchCustomerKhatas(cleanPhone);
+    } catch (_) {}
 
-    // 6. Sync own shopkeeper data if this user has any shop parties
-    if (_parties.isNotEmpty || (_businessProfile.businessName.isNotEmpty && _businessProfile.businessName != 'My Business')) {
-      await syncToCloud();
-    }
+    // 6. Push unified state back to Firestore so all indices are fresh
+    try {
+      await cloudSyncService.syncShopkeeperData(
+        business: _businessProfile,
+        parties: _parties,
+        transactions: _transactions,
+        cashEntries: _cashEntries,
+        deletedItems: _deletedItems,
+        userPhone: cleanPhone,
+      );
+    } catch (_) {}
 
+    _lastSyncTime = DateTime.now();
+    await storageService.updateLastSyncTime();
+
+    _isSyncing = false;
+    _syncStatusMessage = null;
     notifyListeners();
   }
 
@@ -604,61 +729,6 @@ class AppStateProvider extends ChangeNotifier {
     await syncToCloud();
     notifyListeners();
     return true;
-  }
-
-  // Google Login & Restore Flow
-  Future<bool> loginWithGoogle(String email) async {
-    final cleanEmail = email.trim().toLowerCase();
-    if (cleanEmail.isEmpty) return false;
-
-    await googleDriveService.linkGoogleAccount(cleanEmail);
-
-    // Check if Google Drive has backup payload
-    final drivePayload = await googleDriveService.fetchDriveBackupPayload(cleanEmail);
-    if (drivePayload != null) {
-      await restoreFromGoogleDrive(cleanEmail);
-    } else {
-      // Check cloud vault
-      final vault = storageService.getCloudVault(cleanEmail);
-      if (vault != null) {
-        await loginWithIdentifier(cleanEmail);
-      } else {
-        await syncToCloud();
-      }
-    }
-
-    _userIdentifier = cleanEmail;
-    _isLoggedIn = true;
-    _isAppUnlocked = true;
-    await storageService.setAuthStatus(isLoggedIn: true, identifier: cleanEmail);
-    await syncToCloud();
-    notifyListeners();
-    return true;
-  }
-
-  // Sign Out / Switch Account
-  Future<void> signOut() async {
-    _isLoggedIn = false;
-    _isAppUnlocked = true;
-    await storageService.setAuthStatus(isLoggedIn: false, identifier: _userIdentifier);
-    notifyListeners();
-  }
-
-  // Delete Account
-  Future<void> deleteAccountPermanently() async {
-    await googleDriveService.deleteDriveBackup(googleDriveService.connectedGoogleAccount);
-    await storageService.wipeAllAccountData();
-    _parties.clear();
-    _transactions.clear();
-    _cashEntries.clear();
-    _deletedItems.clear();
-    _businessProfile = BusinessProfile();
-    _isLoggedIn = false;
-    _userIdentifier = '';
-    _isAppLockEnabled = false;
-    _appLockPin = '';
-    _isAppUnlocked = true;
-    notifyListeners();
   }
 
   // Calculation Helpers

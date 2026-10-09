@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
 import '../models/transaction.dart';
-import '../providers/app_state_provider.dart';
 import '../theme/app_theme.dart';
 
 class TransactionListItem extends StatelessWidget {
@@ -64,10 +62,8 @@ class TransactionListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final provider = context.watch<AppStateProvider>();
     final isGave = transaction.type == TransactionType.youGave;
     final color = isGave ? AppTheme.debitRed : AppTheme.creditGreen;
-    final isHidden = provider.isBalanceHidden;
     final timeFormat = DateFormat('hh:mm a');
 
     return Container(
@@ -195,7 +191,7 @@ class TransactionListItem extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
-                isHidden ? '••••••' : '${isGave ? "-" : "+"} $currency ${transaction.amount.toStringAsFixed(0)}',
+                '${isGave ? "-" : "+"} $currency ${transaction.amount.toStringAsFixed(0)}',
                 style: GoogleFonts.outfit(
                   fontSize: 15.5,
                   fontWeight: FontWeight.bold,
